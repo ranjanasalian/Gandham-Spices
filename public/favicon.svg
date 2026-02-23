@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Pestle -->
+  <line x1="38" y1="8" x2="26" y2="28" stroke="#D97706" stroke-width="5" stroke-linecap="round"/>
+  <!-- Pestle knob -->
+  <circle cx="39" cy="7" r="4" fill="#D97706"/>
+  <!-- Mortar bowl -->
+  <path d="M10 32 C10 32 8 52 32 52 C56 52 54 32 54 32 Z" fill="#D97706"/>
+  <!-- Mortar rim -->
+  <rect x="6" y="28" rx="3" ry="3" width="52" height="8" fill="#B45309"/>
+  <!-- Spice dots inside mortar -->
+  <circle cx="24" cy="40" r="2" fill="#FCD34D" opacity="0.7"/>
+  <circle cx="34" cy="38" r="1.5" fill="#FCD34D" opacity="0.6"/>
+  <circle cx="28" cy="44" r="1.8" fill="#FCD34D" opacity="0.5"/>
+  <!-- Aroma lines -->
+  <path d="M22 22 C20 18 22 14 22 12" stroke="#D97706" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.4"/>
+  <path d="M28 20 C26 16 28 12 28 10" stroke="#D97706" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.3"/>
+</svg>
