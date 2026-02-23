@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&family=Monarda:wght@400&family=Playwrite+Cuba:wght@400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #0f172a;
+  background-color: #f8fafc;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #f8fafc;
+  overscroll-behavior-y: none;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* Prevent horizontal overflow on mobile */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Smooth menu transitions */
+.mobile-menu-enter {
+  animation: menuSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mobile-menu-exit {
+  animation: menuSlideOut 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes menuSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes menuSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* Staggered menu link animations */
+.menu-link-stagger>*:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.menu-link-stagger>*:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.menu-link-stagger>*:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.menu-link-stagger>*:nth-child(4) {
+  animation-delay: 0.2s;
+}
+
+.menu-link-stagger>*:nth-child(5) {
+  animation-delay: 0.25s;
+}
+
+.menu-link-stagger>*:nth-child(6) {
+  animation-delay: 0.3s;
+}
+
+.menu-link-stagger>* {
+  opacity: 0;
+  transform: translateX(-12px);
+  animation: menuLinkIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes menuLinkIn {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
