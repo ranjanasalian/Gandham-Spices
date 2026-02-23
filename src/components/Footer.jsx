@@ -16,8 +16,8 @@ const Footer = () => (
         >
           Instagram
         </a>
-        <a href="mailto:hello@gandhamspices.com" className="transition hover:text-sand">
-          hello@gandhamspices.com
+        <a href="mailto:gandhamspices@gmail.com" className="transition hover:text-sand">
+          gandhamspices@gmail.com
         </a>
         <span>© {new Date().getFullYear()}</span>
       </div>
