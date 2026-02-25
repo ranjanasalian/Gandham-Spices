@@ -3,11 +3,36 @@ import { contactContent } from '../content/siteContent'
 
 const Contact = () => {
   const [status, setStatus] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    setStatus('Thanks for getting in touch! We will reply within a day.')
-    event.target.reset()
+    setIsSubmitting(true)
+    setStatus('')
+
+    const formData = new FormData(event.target)
+    formData.append('access_key', '059fbae9-8e79-402c-9594-0ceb37679e4d')
+    formData.append('subject', 'New inquiry from Gandham Spices website')
+    formData.append('from_name', 'Gandham Spices Website')
+
+    try {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setStatus('success')
+        event.target.reset()
+      } else {
+        setStatus('error')
+      }
+    } catch {
+      setStatus('error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -29,6 +54,8 @@ const Contact = () => {
           onSubmit={handleSubmit}
           className="space-y-4 rounded-2xl border border-slate-100 bg-sand/40 p-5 shadow-lg sm:rounded-3xl sm:p-6"
         >
+          {/* Honeypot spam protection - hidden from real users */}
+          <input type="checkbox" name="botcheck" className="hidden" style={{ display: 'none' }} />
           <div>
             <label className="text-sm font-semibold text-charcoal" htmlFor="name">
               {contactContent.form.name}
@@ -67,11 +94,21 @@ const Contact = () => {
           </div>
           <button
             type="submit"
-            className="w-full rounded-full bg-terracotta px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-terracotta/30 transition hover:bg-saffron active:scale-[0.98]"
+            disabled={isSubmitting}
+            className="w-full rounded-full bg-terracotta px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-terracotta/30 transition hover:bg-saffron active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Send Inquiry
+            {isSubmitting ? 'Sending...' : 'Send Inquiry'}
           </button>
-          {status && <p className="text-sm text-saffron">{status}</p>}
+          {status === 'success' && (
+            <p className="text-sm font-medium text-green-600">
+              ✓ Thanks for getting in touch! We'll reply within a day.
+            </p>
+          )}
+          {status === 'error' && (
+            <p className="text-sm font-medium text-red-500">
+              Something went wrong. Please try again or email us directly at gandhamspices@gmail.com
+            </p>
+          )}
         </form>
       </div>
     </section>
