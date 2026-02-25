@@ -29,7 +29,6 @@ const Story = () => (
           src={storyContent.image}
           alt="Founder roasting spices by hand"
           className="relative h-64 w-full rounded-3xl object-cover shadow-2xl sm:h-80 md:h-full"
-          loading="lazy"
         />
         <div className="absolute bottom-4 left-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-charcoal shadow sm:bottom-6 sm:left-6 sm:px-4 sm:py-2 sm:text-sm">
           Hands-on roasting

@@ -30,7 +30,7 @@ const Hero = () => {
           src={media?.src}
           alt="Spices in motion"
           className="absolute inset-0 h-full w-full object-cover"
-          loading="lazy"
+          fetchPriority="high"
         />
       )}
 

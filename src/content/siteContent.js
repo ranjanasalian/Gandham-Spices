@@ -1,10 +1,10 @@
-import artisanProcessImg from "../images/Artisan process.png";
-import biryaniImg from "../images/Biriyani.png";
-import rasamImg from "../images/Rasam.png";
-import biryaniGroundedImg from "../images/Biriyani grounded.png";
-import rasamGroundedImg from "../images/Rasam powder grounded.png";
-import homeImg from "../images/home.png";
-import recipeImg from "../images/recipe.png";
+import artisanProcessImg from "../images/Artisan process.webp";
+import biryaniImg from "../images/Biriyani.webp";
+import rasamImg from "../images/Rasam.webp";
+import biryaniGroundedImg from "../images/Biriyani grounded.webp";
+import rasamGroundedImg from "../images/Rasam powder grounded.webp";
+import homeImg from "../images/home.webp";
+import recipeImg from "../images/recipe.webp";
 
 export const navLinks = [
   { label: "Home", type: "route", href: "/" },

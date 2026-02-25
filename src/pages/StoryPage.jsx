@@ -4,10 +4,10 @@ import Header from '../components/Header'
 import Contact from '../components/Contact'
 import Footer from '../components/Footer'
 
-import meaningImg from '../images/The Meaning of Gandham.png'
-import whyImg from '../images/Why We Started Gandham.png'
-import handsOnImg from '../images/The Hands-On Process.png'
-import missionImg from '../images/Our Mission.png'
+import meaningImg from '../images/The Meaning of Gandham.webp'
+import whyImg from '../images/Why We Started Gandham.webp'
+import handsOnImg from '../images/The Hands-On Process.webp'
+import missionImg from '../images/Our Mission.webp'
 
 const storySections = [
   {
@@ -106,7 +106,8 @@ const StoryPage = () => {
                       alt=""
                       className={`relative h-full w-full object-cover shadow-2xl transition duration-700 ${section.imageShape === 'circle' ? 'rounded-full' : 'rounded-2xl sm:rounded-[32px]'
                         }`}
-                      loading="lazy"
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      fetchPriority={index === 0 ? 'high' : 'auto'}
                     />
                   </div>
                 </div>
