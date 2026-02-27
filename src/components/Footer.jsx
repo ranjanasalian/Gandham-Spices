@@ -4,7 +4,7 @@ const Footer = () => (
       <div>
         <p className="text-base font-semibold sm:text-lg">Gandham Spices</p>
         <p className="text-xs text-slate-300 sm:text-sm">
-          Made with love in Brahmavar.
+          Crafted in Our Kitchen. Served in Yours.
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-300 sm:gap-6 sm:text-sm">

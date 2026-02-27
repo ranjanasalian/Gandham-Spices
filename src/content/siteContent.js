@@ -154,7 +154,7 @@ export const contactContent = {
   tagline: "Talk to Us",
   description:
     "Need a custom blend, bulk order, or chef collaboration? Drop us a note and we will reply within 24 hours.",
-  addressTagline: "Made with love in Brahmavar",
+  addressTagline: "Crafted in Our Kitchen. Served in Yours.",
   form: {
     name: "Full Name",
     email: "Email Address",
