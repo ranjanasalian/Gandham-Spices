@@ -146,8 +146,8 @@ export const testimonials = [
 ];
 
 export const socialProof = {
-  instagramHandle: "@gandham.spices",
-  instagramUrl: "https://instagram.com/gandham.spices",
+  instagramHandle: "@gandhamspices",
+  instagramUrl: "https://instagram.com/gandhamspices",
 };
 
 export const contactContent = {
