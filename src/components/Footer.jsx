@@ -9,7 +9,7 @@ const Footer = () => (
       </div>
       <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-300 sm:gap-6 sm:text-sm">
         <a
-          href="https://instagram.com/gandham.spices"
+          href="https://instagram.com/gandhamspices"
           target="_blank"
           rel="noreferrer"
           className="transition hover:text-sand"
