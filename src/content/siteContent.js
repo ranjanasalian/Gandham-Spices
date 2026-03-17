@@ -42,7 +42,7 @@ export const products = [
     slug: "biryani",
     name: "Biryani Marination Mix",
     description: "The secret to authentic, aromatic biryani.",
-    price: "₹150 / 100g",
+    price: "₹120 / 100g",
     image: biryaniImg,
     ctaLabel: "View Recipe & Usage",
     ctaTarget: "/recipes/biryani",
@@ -53,7 +53,7 @@ export const products = [
     name: "Temple-Style Rasam Powder",
     description:
       "Tangy, delicious, and soulful—just like South Indian temples.",
-    price: "₹90 / 100g",
+    price: "₹60 / 100g",
     image: rasamImg,
     ctaLabel: "View Recipe & Usage",
     ctaTarget: "/recipes/rasam",
