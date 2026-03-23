@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import { Link } from 'react-router-dom'
 
 const highlightMix = (text) => {
-  const phrase = '2½ tbsp Biryani Marination Mix'
+  const phrase = 'Gandham Spices Biryani Marination Mix'
   if (!text.includes(phrase)) return text
   const [before, after] = text.split(phrase)
   return (
@@ -47,13 +47,18 @@ const RecipeDetail = ({ recipe }) => (
               <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-saffron sm:text-sm">
                 Directions
               </h2>
-              <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm text-slate-700 sm:mt-4 sm:text-base">
-                {recipe.steps.map((step) => (
-                  <li key={step} className="leading-relaxed">
-                    {highlightMix(step)}
-                  </li>
+              <div className="mt-3 space-y-5 text-sm text-slate-700 sm:mt-4 sm:text-base">
+                {recipe.steps.map((step, idx) => (
+                  <div key={idx}>
+                    {recipe.stepsHeadings && recipe.stepsHeadings[idx] && (
+                      <h3 className="mb-2 text-sm font-bold text-charcoal sm:text-base">
+                        {recipe.stepsHeadings[idx]}
+                      </h3>
+                    )}
+                    <p className="leading-relaxed">{highlightMix(step)}</p>
+                  </div>
                 ))}
-              </ol>
+              </div>
             </>
           ) : (
             <div className="rounded-2xl bg-sand/60 p-5 text-sm text-slate-600 sm:rounded-3xl sm:p-6 sm:text-base">
@@ -83,9 +88,11 @@ RecipeDetail.propTypes = {
     heroImage: PropTypes.string.isRequired,
     ingredients: PropTypes.arrayOf(PropTypes.string).isRequired,
     steps: PropTypes.arrayOf(PropTypes.string),
+    stepsHeadings: PropTypes.arrayOf(PropTypes.string),
     placeholder: PropTypes.string,
     name: PropTypes.string,
   }).isRequired,
 }
 
 export default RecipeDetail
+
