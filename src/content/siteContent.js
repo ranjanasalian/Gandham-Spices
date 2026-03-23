@@ -3,6 +3,8 @@ import biryaniImg from "../images/Biriyani.webp";
 import rasamImg from "../images/Rasam.webp";
 import biryaniGroundedImg from "../images/Biriyani grounded.webp";
 import rasamGroundedImg from "../images/Rasam powder grounded.webp";
+import biryaniPowderImg from "../images/Biriyani Powder.png";
+import rasamPowderImg from "../images/rasam powder.png";
 import homeImg from "../images/home.webp";
 import recipeImg from "../images/recipe.webp";
 
@@ -43,7 +45,7 @@ export const products = [
     name: "Biryani Marination Mix",
     description: "The secret to authentic, aromatic biryani.",
     price: "₹120 / 100g",
-    image: biryaniImg,
+    image: biryaniPowderImg,
     ctaLabel: "View Recipe & Usage",
     ctaTarget: "/recipes/biryani",
   },
@@ -54,7 +56,7 @@ export const products = [
     description:
       "Tangy, delicious, and soulful—just like South Indian temples.",
     price: "₹60 / 100g",
-    image: rasamImg,
+    image: rasamPowderImg,
     ctaLabel: "View Recipe & Usage",
     ctaTarget: "/recipes/rasam",
   },
@@ -64,8 +66,8 @@ export const recipes = [
   {
     id: "biryani",
     slug: "biryani",
-    title: "Biryani Marination Mix Powder",
-    heroImage: biryaniGroundedImg,
+    title: "Chicken Biryani",
+    heroImage: biryaniImg,
     recipeHubImage: recipeImg,
     subtitle: "Directions for Use – Chicken Biryani (Serves 4–5)",
     ingredients: [
@@ -93,8 +95,8 @@ export const recipes = [
   {
     id: "rasam",
     slug: "rasam",
-    title: "Temple-Style Rasam Powder",
-    heroImage: rasamGroundedImg,
+    title: "Temple-Style Rasam",
+    heroImage: rasamImg,
     subtitle: "Directions for Use",
     placeholder:
       "Detailed directions are on the way. Check back soon for the temple-style rasam ritual.",
