@@ -55,7 +55,7 @@ export const products = [
     name: "Temple-Style Rasam Powder",
     description:
       "Tangy, delicious, and soulful—just like South Indian temples.",
-    price: "₹60 / 100g",
+    price: "₹60 / 50g",
     image: rasamPowderImg,
     ctaLabel: "View Recipe & Usage",
     ctaTarget: "/recipes/rasam",
