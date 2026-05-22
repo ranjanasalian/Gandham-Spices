@@ -28,7 +28,7 @@ const Blends = () => (
               />
               <div className="absolute inset-0 bg-gradient-to-t from-charcoal/60 via-transparent to-transparent" />
               <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-0.5 text-xs font-semibold text-charcoal sm:left-4 sm:top-4 sm:px-4 sm:py-1">
-                100g
+                {product.weight}
               </span>
             </div>
             <div className="space-y-1.5 text-charcoal sm:space-y-2">

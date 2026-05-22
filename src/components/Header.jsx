@@ -16,7 +16,7 @@ const Header = () => {
     const onScroll = () => setIsScrolled(window.scrollY > 24)
     window.addEventListener('scroll', onScroll, { passive: true })
     // Check immediately on mount and on route change
-    setIsScrolled(window.scrollY > 24)
+    requestAnimationFrame(() => setIsScrolled(window.scrollY > 24))
     return () => window.removeEventListener('scroll', onScroll)
   }, [location.pathname])
 

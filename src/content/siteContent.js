@@ -30,7 +30,7 @@ export const heroContent = {
 export const storyContent = {
   heading: "OUR ARTISAN PROCESS",
   meaning:
-    "In Sanskrit, "Gandham" means fragrance. It is the aroma of roasted coriander escaping the grinder, the curl of pepper steam that wakes up a pot of rasam-the scent of home cooking.",
+    "In Sanskrit, \"Gandham\" means fragrance. It is the aroma of roasted coriander escaping the grinder, the curl of pepper steam that wakes up a pot of rasam-the scent of home cooking.",
   mission:
     "We follow a hands-on approach: slow-roasting, hand-grinding, and testing every batch ourselves to ensure the richness of home-style cooking fits perfectly into your modern life.",
   promise:
@@ -45,6 +45,7 @@ export const products = [
     name: "Biryani Marination Mix",
     description: "The secret to authentic, aromatic biryani.",
     price: "₹120 / 100g",
+    weight: "100g",
     image: biryaniPowderImg,
     ctaLabel: "View Recipe & Usage",
     ctaTarget: "/recipes/biryani",
@@ -56,6 +57,7 @@ export const products = [
     description:
       "Tangy, delicious, and soulful—just like South Indian temples.",
     price: "₹60 / 50g",
+    weight: "50g",
     image: rasamPowderImg,
     ctaLabel: "View Recipe & Usage",
     ctaTarget: "/recipes/rasam",
@@ -133,7 +135,7 @@ export const testimonials = [
   },
   {
     quote:
-      "Clients keep asking how our rasam suddenly tastes "temple-grade." Gandham is now the not-so-secret weapon at our supper club.",
+      "Clients keep asking how our rasam suddenly tastes \"temple-grade.\" Gandham is now the not-so-secret weapon at our supper club.",
     name: "Chef Mira D'Souza",
     title: "Founder, Coastline Table",
   },
