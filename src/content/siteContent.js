@@ -30,7 +30,7 @@ export const heroContent = {
 export const storyContent = {
   heading: "OUR ARTISAN PROCESS",
   meaning:
-    "In Sanskrit, “Gandham” means fragrance. It is the aroma of roasted coriander escaping the grinder, the curl of pepper steam that wakes up a pot of rasam-the scent of home cooking.",
+    "In Sanskrit, "Gandham" means fragrance. It is the aroma of roasted coriander escaping the grinder, the curl of pepper steam that wakes up a pot of rasam-the scent of home cooking.",
   mission:
     "We follow a hands-on approach: slow-roasting, hand-grinding, and testing every batch ourselves to ensure the richness of home-style cooking fits perfectly into your modern life.",
   promise:
@@ -127,14 +127,14 @@ export const recipes = [
 export const testimonials = [
   {
     quote:
-      "Every jar smells like someone just roasted the spices in their backyard. The biryani mix took me straight to my grandmother’s kitchen.",
+      "Every jar smells like someone just roasted the spices in their backyard. The biryani mix took me straight to my grandmother's kitchen.",
     name: "Anya Prabhu",
     title: "Food stylist, Bengaluru",
   },
   {
     quote:
-      "Clients keep asking how our rasam suddenly tastes “temple-grade.” Gandham is now the not-so-secret weapon at our supper club.",
-    name: "Chef Mira D’Souza",
+      "Clients keep asking how our rasam suddenly tastes "temple-grade." Gandham is now the not-so-secret weapon at our supper club.",
+    name: "Chef Mira D'Souza",
     title: "Founder, Coastline Table",
   },
   {
