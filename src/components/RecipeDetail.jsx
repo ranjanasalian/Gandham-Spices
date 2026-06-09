@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 
 const highlightMix = (text) => {
   // Matches any spelling of Biryani/Biriyani, Rasam, and Chicken Sukka blends case-insensitively
-  const regex = /(Gandham Spices Biry[ai]ni Marination Mix|Biry[ai]ni Marination Mix|Gandham Rasam Powder|Rasam Powder|Chicken Sukka Powder)/gi
+  const regex = /(Gandham Spices Biry[ai]ni Marination Mix|Biry[ai]ni Marination Mix|Gandham Rasam Powder|Rasam Powder|Chicken Sukka Masala)/gi
 
   const parts = text.split(regex)
   return parts.map((part, index) => {

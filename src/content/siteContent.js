@@ -7,8 +7,8 @@ import biryaniPowderImg from "../images/Biriyani Powder.png";
 import rasamPowderImg from "../images/rasam powder.png";
 import homeImg from "../images/home.webp";
 import recipeImg from "../images/recipe.webp";
-import chickenSukkaGroundedImg from "../images/Chicken Sukka Grounded.png";
-import chickenSukkaPowderImg from "../images/Chicken Sukka Powder.png";
+import chickenSukkaMasalaGroundedImg from "../images/chicken sukka masala grounded.png";
+import chickenSukkaMasalaImg from "../images/chicken sukka masala.png";
 
 export const navLinks = [
   { label: "Home", type: "route", href: "/" },
@@ -67,11 +67,11 @@ export const products = [
   {
     id: "chicken-sukka",
     slug: "chicken-sukka",
-    name: "Chicken Sukka Powder",
+    name: "Chicken Sukka Masala",
     description: "Traditional coastal style spice blend for rich, dry chicken sukka.",
     price: "₹60 / 50g",
     weight: "50g",
-    image: chickenSukkaGroundedImg,
+    image: chickenSukkaMasalaGroundedImg,
     ctaLabel: "View Recipe & Usage",
     ctaTarget: "/recipes/chicken-sukka",
   },
@@ -140,9 +140,9 @@ export const recipes = [
   {
     id: "chicken-sukka",
     slug: "chicken-sukka",
-    title: "Chicken Sukka Powder",
-    heroImage: chickenSukkaPowderImg,
-    recipeHubImage: chickenSukkaPowderImg,
+    title: "Coastal Chicken Sukka",
+    heroImage: chickenSukkaMasalaImg,
+    recipeHubImage: chickenSukkaMasalaImg,
     subtitle: "Directions for Use – Chicken Sukka (Serves 5–6)",
     ingredients: [
       "Chicken – 1 kg",
@@ -159,8 +159,8 @@ export const recipes = [
       "Ghee – 3 teaspoons",
       "Fresh Coriander Leaves – for garnish",
     ],
-    name: "Chicken Sukka Powder",
-    instructionsImage: chickenSukkaGroundedImg,
+    name: "Chicken Sukka Masala",
+    instructionsImage: chickenSukkaMasalaGroundedImg,
     steps: [
       "Heat 4 teaspoons of oil in a kadai.",
       "Add ¼ teaspoon sesame seeds and allow them to crackle.",
@@ -169,7 +169,7 @@ export const recipes = [
       "Add ¼ teaspoon turmeric powder and mix well.",
       "Add the diced tomatoes and cook.",
       "Allow the chicken to cook until it is about 75% done.",
-      "Add the Chicken Sukka Powder and mix thoroughly.",
+      "Add the Chicken Sukka Masala and mix thoroughly.",
       "If more gravy is desired, add ½ cup water.",
       "Continue cooking until the chicken is fully cooked.",
       "Add 1 cup grated coconut and mix well.",
