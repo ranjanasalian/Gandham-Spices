@@ -2,16 +2,21 @@ import PropTypes from 'prop-types'
 import { Link } from 'react-router-dom'
 
 const highlightMix = (text) => {
-  const phrase = 'Gandham Spices Biryani Marination Mix'
-  if (!text.includes(phrase)) return text
-  const [before, after] = text.split(phrase)
-  return (
-    <>
-      {before}
-      <strong>{phrase}</strong>
-      {after}
-    </>
-  )
+  // Matches any spelling of Biryani/Biriyani, Rasam, and Chicken Sukka blends case-insensitively
+  const regex = /(Gandham Spices Biry[ai]ni Marination Mix|Biry[ai]ni Marination Mix|Gandham Rasam Powder|Rasam Powder|Chicken Sukka Powder)/gi
+
+  const parts = text.split(regex)
+  return parts.map((part, index) => {
+    if (regex.test(part)) {
+      regex.lastIndex = 0 // Reset regex state
+      return (
+        <strong key={index} className="font-semibold text-charcoal">
+          {part}
+        </strong>
+      )
+    }
+    return part
+  })
 }
 
 const RecipeDetail = ({ recipe }) => (
@@ -24,12 +29,14 @@ const RecipeDetail = ({ recipe }) => (
         <h1 className="font-display text-3xl text-charcoal sm:text-4xl">{recipe.title}</h1>
         <p className="text-sm text-slate-600 sm:text-base">{recipe.subtitle}</p>
       </div>
-      <img
-        src={recipe.heroImage}
-        alt={recipe.title}
-        className="mx-auto max-w-full rounded-2xl object-contain sm:max-w-md sm:rounded-3xl"
-        loading="lazy"
-      />
+      <div className="mx-auto w-full max-w-md overflow-hidden rounded-2xl sm:rounded-3xl aspect-[4/3] bg-slate-50 flex items-center justify-center">
+        <img
+          src={recipe.heroImage}
+          alt={recipe.title}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      </div>
       <div className="grid gap-8 sm:gap-10 md:grid-cols-2">
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-saffron sm:text-sm">

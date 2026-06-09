@@ -7,6 +7,8 @@ import biryaniPowderImg from "../images/Biriyani Powder.png";
 import rasamPowderImg from "../images/rasam powder.png";
 import homeImg from "../images/home.webp";
 import recipeImg from "../images/recipe.webp";
+import chickenSukkaGroundedImg from "../images/Chicken Sukka Grounded.png";
+import chickenSukkaPowderImg from "../images/Chicken Sukka Powder.png";
 
 export const navLinks = [
   { label: "Home", type: "route", href: "/" },
@@ -61,6 +63,17 @@ export const products = [
     image: rasamPowderImg,
     ctaLabel: "View Recipe & Usage",
     ctaTarget: "/recipes/rasam",
+  },
+  {
+    id: "chicken-sukka",
+    slug: "chicken-sukka",
+    name: "Chicken Sukka Powder",
+    description: "Traditional coastal style spice blend for rich, dry chicken sukka.",
+    price: "₹60 / 50g",
+    weight: "50g",
+    image: chickenSukkaGroundedImg,
+    ctaLabel: "View Recipe & Usage",
+    ctaTarget: "/recipes/chicken-sukka",
   },
 ];
 
@@ -122,6 +135,48 @@ export const recipes = [
       "Once the cooker has cooled, open the lid, place it on the stove, add 3–4 tsp Gandham Rasam Powder, bring it to a boil, and simmer for 3–4 minutes.",
       "Prepare the tadka: heat 1 tsp coconut oil, add ½ tsp mustard seeds, 2 dry byadgi chilies, and 2–3 curry leaves, then pour over the rasam.",
       "Garnish with coriander leaves and serve hot.",
+    ],
+  },
+  {
+    id: "chicken-sukka",
+    slug: "chicken-sukka",
+    title: "Chicken Sukka Powder",
+    heroImage: chickenSukkaPowderImg,
+    recipeHubImage: chickenSukkaPowderImg,
+    subtitle: "Directions for Use – Chicken Sukka (Serves 5–6)",
+    ingredients: [
+      "Chicken – 1 kg",
+      "Oil – 4 teaspoons",
+      "Sesame Seeds – ¼ teaspoon",
+      "Onions – 2 medium, thinly sliced",
+      "Curry Leaves – a few",
+      "Green Chillies – 2, slit",
+      "Ginger – 1 inch piece, thinly sliced",
+      "Tomatoes – 2 medium, diced",
+      "Salt – to taste",
+      "Turmeric Powder – ¼ teaspoon",
+      "Fresh Grated Coconut – 1 cup",
+      "Ghee – 3 teaspoons",
+      "Fresh Coriander Leaves – for garnish",
+    ],
+    name: "Chicken Sukka Powder",
+    instructionsImage: chickenSukkaGroundedImg,
+    steps: [
+      "Heat 4 teaspoons of oil in a kadai.",
+      "Add ¼ teaspoon sesame seeds and allow them to crackle.",
+      "Add the sliced onions, curry leaves, green chillies, and ginger. Sauté until the onions turn golden brown.",
+      "Add the chicken and salt to taste.",
+      "Add ¼ teaspoon turmeric powder and mix well.",
+      "Add the diced tomatoes and cook.",
+      "Allow the chicken to cook until it is about 75% done.",
+      "Add the Chicken Sukka Powder and mix thoroughly.",
+      "If more gravy is desired, add ½ cup water.",
+      "Continue cooking until the chicken is fully cooked.",
+      "Add 1 cup grated coconut and mix well.",
+      "Cook on low flame for 5 minutes.",
+      "Add 3 teaspoons of ghee and mix gently.",
+      "Garnish with fresh coriander leaves.",
+      "Serve hot with neer dosa, roti, rice, or as a side dish.",
     ],
   },
 ];
