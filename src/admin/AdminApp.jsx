@@ -22,11 +22,29 @@ import SupplierMgmt from './pages/SupplierMgmt';
 import SalesTargetDashboard from './pages/SalesTargetDashboard';
 import Reports from './pages/Reports';
 
+const getTabFromPath = () => {
+  const path = window.location.pathname;
+  const parts = path.split('/admin/');
+  if (parts.length > 1 && parts[1]) {
+    return parts[1].split('/')[0] || 'home';
+  }
+  return 'home';
+};
+
 export default function AdminApp() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentTab, setCurrentTab] = useState('home');
+  const [currentTab, setCurrentTab] = useState(getTabFromPath());
   const [isDarkMode, setIsDarkMode] = useState(true);
+
+  // Sync tab state when back/forward browser buttons are pressed
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentTab(getTabFromPath());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('gandham_admin_token');
@@ -52,6 +70,12 @@ export default function AdminApp() {
       setLoading(false);
     }
   }, []);
+
+  const handleTabChange = (tab) => {
+    setCurrentTab(tab);
+    const newPath = tab === 'home' ? '/admin' : `/admin/${tab}`;
+    window.history.pushState(null, '', newPath);
+  };
 
   const renderPageContent = () => {
     switch (currentTab) {
@@ -111,7 +135,7 @@ export default function AdminApp() {
     <AdminLayout
       user={user}
       currentTab={currentTab}
-      setCurrentTab={setCurrentTab}
+      setCurrentTab={handleTabChange}
       isDarkMode={isDarkMode}
       setIsDarkMode={setIsDarkMode}
     >
