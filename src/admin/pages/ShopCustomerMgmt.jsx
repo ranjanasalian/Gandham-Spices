@@ -138,7 +138,7 @@ export default function ShopCustomerMgmt() {
       {editorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
-          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-lg z-10 shadow-2xl animate-fade-in-up text-xs">
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-lg z-10 shadow-2xl animate-fade-in-up text-xs max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4 border-b pb-2 flex items-center gap-2">
               <Store className="w-5 h-5 text-saffron" />
               <span>{editId ? 'Modify Customer Profile' : 'Register Customer Profile'}</span>
