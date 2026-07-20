@@ -13,6 +13,11 @@ export default function InventoryMgmt() {
   const [newItemUnit, setNewItemUnit] = useState('kg');
   const [newItemMinStock, setNewItemMinStock] = useState('');
 
+  // Bulk / Selection States
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null); // string (ID) or 'bulk'
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -58,16 +63,38 @@ export default function InventoryMgmt() {
     }
   };
 
-  const handleDeleteItem = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this raw material? All associated stock records will be removed.')) return;
+  const triggerSingleDelete = (id) => {
+    setItemToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const triggerBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+    setItemToDelete('bulk');
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    setDeleteConfirmOpen(false);
     setError('');
     setSuccess('');
+
     try {
-      await api.rawMaterials.delete(id);
-      setSuccess('Raw material deleted from registry.');
+      if (itemToDelete === 'bulk') {
+        // Delete all selected items sequentially
+        await Promise.all(selectedIds.map(id => api.rawMaterials.delete(id)));
+        setSuccess(`${selectedIds.length} raw materials deleted from registry.`);
+        setSelectedIds([]);
+      } else {
+        await api.rawMaterials.delete(itemToDelete);
+        setSuccess('Raw material deleted from registry.');
+        setSelectedIds(prev => prev.filter(id => id !== itemToDelete));
+      }
       loadData();
     } catch (err) {
-      setError('Failed to delete raw material type');
+      setError('Failed to delete selected raw material(s)');
+    } finally {
+      setItemToDelete(null);
     }
   };
 
@@ -84,13 +111,13 @@ export default function InventoryMgmt() {
       
       {/* Notifications */}
       {error && (
-        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-500 p-3.5 rounded-xl text-xs">
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-500 p-3.5 rounded-xl text-xs font-semibold">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {success && (
-        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 p-3.5 rounded-xl text-xs">
+        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 p-3.5 rounded-xl text-xs font-semibold">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
           <span>{success}</span>
         </div>
@@ -171,15 +198,40 @@ export default function InventoryMgmt() {
 
         {/* ---------------- STOCK GRID LIST ---------------- */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col h-full min-h-[400px]">
-          <h3 className="text-base font-bold flex items-center gap-2 mb-6 border-b pb-2">
-            <Archive className="w-5 h-5 text-saffron" />
-            <span>Raw Materials Inventory Registry</span>
-          </h3>
+          <div className="flex justify-between items-center mb-6 border-b pb-2">
+            <h3 className="text-base font-bold flex items-center gap-2">
+              <Archive className="w-5 h-5 text-saffron" />
+              <span>Raw Materials Inventory Registry</span>
+            </h3>
+            {selectedIds.length > 0 && (
+              <button
+                onClick={triggerBulkDelete}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-500 hover:bg-red-600 text-white font-bold text-[10px] rounded-lg shadow-sm transition-all animate-fade-in"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Selected ({selectedIds.length})</span>
+              </button>
+            )}
+          </div>
 
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-xs text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  <th className="py-3 px-2 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={materials.length > 0 && selectedIds.length === materials.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(materials.map(m => m.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-slate-350 dark:border-slate-700 text-saffron focus:ring-saffron"
+                    />
+                  </th>
                   <th className="py-3 px-2">Material Name</th>
                   <th className="py-3 px-2 text-right">Total Purchased</th>
                   <th className="py-3 px-2 text-right">Total Used</th>
@@ -192,7 +244,7 @@ export default function InventoryMgmt() {
               <tbody>
                 {materials.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="text-center py-10 text-slate-400">
+                    <td colSpan="8" className="text-center py-10 text-slate-400">
                       No raw materials registered. Add items above to start.
                     </td>
                   </tr>
@@ -201,6 +253,20 @@ export default function InventoryMgmt() {
                     const isLow = m.currentStock < m.minStockLevel;
                     return (
                       <tr key={m.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">
+                        <td className="py-3 px-2 text-center w-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(m.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIds(prev => [...prev, m.id]);
+                              } else {
+                                setSelectedIds(prev => prev.filter(id => id !== m.id));
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-slate-350 dark:border-slate-700 text-saffron focus:ring-saffron"
+                          />
+                        </td>
                         <td className="py-3 px-2 font-bold text-slate-800 dark:text-white">{m.name}</td>
                         <td className="py-3 px-2 text-right text-slate-600 dark:text-slate-350">
                           {m.totalPurchased || 0} {m.unit}
@@ -223,8 +289,8 @@ export default function InventoryMgmt() {
                         </td>
                         <td className="py-3 px-2 text-center">
                           <button
-                            onClick={() => handleDeleteItem(m.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors animate-fade-in"
+                            onClick={() => triggerSingleDelete(m.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
                             title="Delete Raw Material"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -240,6 +306,43 @@ export default function InventoryMgmt() {
         </div>
 
       </div>
+
+      {/* ---------------- CUSTOM CONFIRM DELETE MODAL ---------------- */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-0" onClick={() => setDeleteConfirmOpen(false)} />
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-sm z-10 shadow-2xl animate-fade-in-up text-center space-y-4">
+            <div className="mx-auto w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">Confirm Deletion</h4>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                {itemToDelete === 'bulk' 
+                  ? `Are you sure you want to delete these ${selectedIds.length} selected raw materials? All associated stock history records will be permanently removed.`
+                  : "Are you sure you want to delete this raw material? All associated stock history records will be permanently removed."
+                }
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(false)}
+                className="py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold rounded-xl text-xs transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl text-xs transition-colors shadow-sm"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
