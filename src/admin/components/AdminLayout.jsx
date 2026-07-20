@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
 import {
   LayoutDashboard, ClipboardList, Factory, FlaskConical, Search, Archive, Package,
@@ -8,6 +8,14 @@ import {
 
 export default function AdminLayout({ user, currentTab, setCurrentTab, children, isDarkMode, setIsDarkMode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mainRef = useRef(null);
+
+  // Scroll to top of workspace container when tab changes
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+  }, [currentTab]);
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -279,7 +287,7 @@ export default function AdminLayout({ user, currentTab, setCurrentTab, children,
         </header>
 
         {/* ---------------- WORKSPACE CONTENT ---------------- */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <div className="mx-auto max-w-7xl animate-fade-in-up">
             {children}
           </div>
