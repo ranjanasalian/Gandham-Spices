@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { ShoppingBag, Plus, AlertCircle, CheckCircle2, DollarSign, RefreshCw, Trash2, Edit2 } from 'lucide-react';
+import { ShoppingBag, Plus, AlertCircle, CheckCircle2, RefreshCw, Trash2, Edit2 } from 'lucide-react';
 
 export default function PurchaseHistory() {
   const [purchases, setPurchases] = useState([]);
@@ -17,6 +17,10 @@ export default function PurchaseHistory() {
   const [totalCost, setTotalCost] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Custom Deletion States
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -118,16 +122,23 @@ export default function PurchaseHistory() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this purchase record? This will adjust ingredient stock.')) return;
+  const triggerDelete = (id) => {
+    setItemToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    setDeleteConfirmOpen(false);
     setError('');
     setSuccess('');
     try {
-      await api.ingredientPurchases.delete(id);
-      setSuccess('Purchase record deleted.');
+      await api.ingredientPurchases.delete(itemToDelete);
+      setSuccess('Purchase record deleted successfully.');
       loadData();
     } catch (err) {
       setError('Failed to delete purchase record');
+    } finally {
+      setItemToDelete(null);
     }
   };
 
@@ -331,7 +342,7 @@ export default function PurchaseHistory() {
                         </td>
                         <td className="py-3 px-2 text-right font-black text-emerald-500">₹{p.totalCost}</td>
                         <td className="py-3 px-2">
-                          <div className="font-semibold text-slate-700 dark:text-slate-300">{p.supplierName || '—'}</div>
+                          <div className="font-semibold text-slate-700 dark:text-slate-350">{p.supplierName || '—'}</div>
                           <div className="text-[10px] text-slate-400">{p.notes}</div>
                         </td>
                         <td className="py-3 px-2 text-center flex justify-center items-center gap-1.5">
@@ -343,7 +354,7 @@ export default function PurchaseHistory() {
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDelete(p.id)}
+                            onClick={() => triggerDelete(p.id)}
                             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
                             title="Delete Purchase Record"
                           >
@@ -360,6 +371,40 @@ export default function PurchaseHistory() {
         </div>
 
       </div>
+
+      {/* ---------------- CUSTOM CONFIRM DELETE MODAL ---------------- */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-0" onClick={() => setDeleteConfirmOpen(false)} />
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-sm z-10 shadow-2xl animate-fade-in-up text-center space-y-4">
+            <div className="mx-auto w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">Confirm Deletion</h4>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                Are you sure you want to delete this purchase record? This will adjust ingredient stock levels and revert associated expenses.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(false)}
+                className="py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold rounded-xl text-xs transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl text-xs transition-colors shadow-sm"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
