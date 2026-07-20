@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Package, Edit2, Plus, AlertCircle, CheckCircle2, RefreshCw, ShoppingBag, Archive } from 'lucide-react';
+import { Package, Edit2, Plus, AlertCircle, CheckCircle2, RefreshCw, ShoppingBag, Archive, Trash2 } from 'lucide-react';
 
 export default function ProductMgmt() {
   const [products, setProducts] = useState([]);
@@ -19,6 +19,30 @@ export default function ProductMgmt() {
   const [productionCost, setProductionCost] = useState('0');
   const [packSize, setPackSize] = useState('100g');
   const [status, setStatus] = useState('Active');
+
+  // Custom Deletion States
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+
+  const triggerDelete = (id) => {
+    setItemToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    setDeleteConfirmOpen(false);
+    setError('');
+    setSuccess('');
+    try {
+      await api.products.delete(itemToDelete);
+      setSuccess('Product deleted successfully from catalog.');
+      fetchProducts();
+    } catch (err) {
+      setError(err.message || 'Failed to delete product from catalog');
+    } finally {
+      setItemToDelete(null);
+    }
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -366,7 +390,7 @@ export default function ProductMgmt() {
 
       {/* ---------------- PRODUCTS TABLE LIST ---------------- */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
           <table className="w-full text-xs text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">
@@ -415,12 +439,20 @@ export default function ProductMgmt() {
                           {p.status}
                         </span>
                       </td>
-                      <td className="py-3 px-2 text-center">
+                      <td className="py-3 px-2 text-center flex justify-center items-center gap-1.5">
                         <button
                           onClick={() => handleEditClick(p)}
                           className="p-1.5 text-slate-400 hover:text-saffron hover:bg-saffron/10 rounded-xl transition-colors"
+                          title="Edit Product Configuration"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => triggerDelete(p.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
+                          title="Delete Product"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     </tr>
@@ -431,6 +463,40 @@ export default function ProductMgmt() {
           </table>
         </div>
       </div>
+
+      {/* ---------------- CUSTOM CONFIRM DELETE MODAL ---------------- */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-0" onClick={() => setDeleteConfirmOpen(false)} />
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-sm z-10 shadow-2xl animate-fade-in-up text-center space-y-4">
+            <div className="mx-auto w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">Confirm Product Deletion</h4>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                Are you sure you want to delete this product? All associated master catalog and inventory records will be permanently removed.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(false)}
+                className="py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold rounded-xl text-xs transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl text-xs transition-colors shadow-sm"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
