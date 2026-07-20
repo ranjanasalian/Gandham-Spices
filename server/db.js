@@ -56,6 +56,7 @@ let collection = null;
 let dbCache = null;
 
 const mongoUri = process.env.MONGODB_URI;
+const FORCE_WIPE = true; // Set to true temporarily to clear the live database
 
 if (mongoUri) {
   try {
@@ -65,11 +66,16 @@ if (mongoUri) {
     const db = client.db('gandham_spices');
     collection = db.collection('state');
     const doc = await collection.findOne({ id: 'global_state' });
-    if (!doc) {
+    if (!doc || FORCE_WIPE) {
       const defaultDB = seedDatabase();
-      await collection.insertOne({ id: 'global_state', data: defaultDB });
+      if (doc) {
+        await collection.updateOne({ id: 'global_state' }, { $set: { data: defaultDB } });
+        console.log('MongoDB Atlas live state wiped and reset to clean template.');
+      } else {
+        await collection.insertOne({ id: 'global_state', data: defaultDB });
+        console.log('MongoDB Atlas successfully initialized with seed database.');
+      }
       dbCache = defaultDB;
-      console.log('MongoDB Atlas successfully initialized with seed database.');
     } else {
       dbCache = doc.data;
       console.log('MongoDB Atlas state successfully loaded.');
