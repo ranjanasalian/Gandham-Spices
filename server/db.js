@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
+import { MongoClient } from 'mongodb';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,30 +50,80 @@ function readDatabaseSync() {
   }
 }
 
-// In-memory cache of database
-let dbCache = readDatabaseSync();
+// MongoDB Persistent State Variables
+let client = null;
+let collection = null;
+let dbCache = null;
+
+const mongoUri = process.env.MONGODB_URI;
+
+if (mongoUri) {
+  try {
+    console.log('Connecting to MongoDB Atlas...');
+    client = new MongoClient(mongoUri);
+    await client.connect();
+    const db = client.db('gandham_spices');
+    collection = db.collection('state');
+    const doc = await collection.findOne({ id: 'global_state' });
+    if (!doc) {
+      const defaultDB = seedDatabase();
+      await collection.insertOne({ id: 'global_state', data: defaultDB });
+      dbCache = defaultDB;
+      console.log('MongoDB Atlas successfully initialized with seed database.');
+    } else {
+      dbCache = doc.data;
+      console.log('MongoDB Atlas state successfully loaded.');
+    }
+  } catch (err) {
+    console.error('MongoDB Atlas connection failed. Falling back to local db.json...', err);
+    dbCache = readDatabaseSync();
+    client = null;
+    collection = null;
+  }
+} else {
+  dbCache = readDatabaseSync();
+}
 
 // Get the DB object
 export function getDB() {
   return dbCache;
 }
 
-// Force reload from disk
+// Force reload
 export async function reloadDB() {
-  ensureDir();
-  if (fs.existsSync(DB_FILE)) {
+  if (collection) {
     try {
-      const raw = await fs.promises.readFile(DB_FILE, 'utf8');
-      dbCache = JSON.parse(raw);
+      const doc = await collection.findOne({ id: 'global_state' });
+      if (doc) {
+        dbCache = doc.data;
+      }
     } catch (err) {
-      console.error('Failed to reload database:', err);
+      console.error('Failed to reload database from MongoDB Atlas:', err);
+    }
+  } else {
+    ensureDir();
+    if (fs.existsSync(DB_FILE)) {
+      try {
+        const raw = await fs.promises.readFile(DB_FILE, 'utf8');
+        dbCache = JSON.parse(raw);
+      } catch (err) {
+        console.error('Failed to reload database:', err);
+      }
     }
   }
 }
 
-// Persist the current in-memory cache to disk
+// Persist the current in-memory cache
 export async function commit() {
-  await saveDatabase(dbCache);
+  if (collection) {
+    try {
+      await collection.updateOne({ id: 'global_state' }, { $set: { data: dbCache } }, { upsert: true });
+    } catch (err) {
+      console.error('Failed to commit state to MongoDB Atlas:', err);
+    }
+  } else {
+    await saveDatabase(dbCache);
+  }
 }
 
 // Default Seed Data Generator
