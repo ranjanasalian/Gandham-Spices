@@ -113,6 +113,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(purchase)
     }),
+    update: (id, purchase) => request(`/admin/ingredient-purchases/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(purchase)
+    }),
     delete: (id) => request(`/admin/ingredient-purchases/${id}`, {
       method: 'DELETE'
     })

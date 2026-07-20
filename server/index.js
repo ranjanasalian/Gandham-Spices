@@ -499,6 +499,76 @@ app.post('/api/admin/ingredient-purchases', authenticateToken, async (req, res) 
   res.status(201).json(newPurchase);
 });
 
+app.put('/api/admin/ingredient-purchases/:id', authenticateToken, async (req, res) => {
+  const db = getDB();
+  if (!db.ingredientPurchases) db.ingredientPurchases = [];
+  const index = db.ingredientPurchases.findIndex(p => p.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Purchase record not found' });
+
+  const current = db.ingredientPurchases[index];
+  const { purchaseDate, rawMaterialId, quantity, totalCost, supplierName, notes } = req.body;
+
+  const rm = db.rawMaterials.find(m => m.id === (rawMaterialId || current.rawMaterialId));
+  if (!rm) return res.status(404).json({ message: 'Raw material type not found' });
+
+  // Revert old supplier adjustments
+  if (current.supplierName) {
+    const oldSupplier = db.suppliers.find(s => s.name.toLowerCase() === current.supplierName.toLowerCase());
+    if (oldSupplier) {
+      oldSupplier.purchaseHistory = (oldSupplier.purchaseHistory || []).filter(h => !(h.date === current.purchaseDate && h.amount === current.totalCost));
+      oldSupplier.outstandingPayments = Math.max(0, parseFloat((oldSupplier.outstandingPayments - current.totalCost).toFixed(2)));
+    }
+  }
+
+  // Update the purchase record
+  db.ingredientPurchases[index] = {
+    ...current,
+    purchaseDate: purchaseDate || current.purchaseDate,
+    rawMaterialId: rawMaterialId || current.rawMaterialId,
+    quantity: quantity !== undefined ? parseFloat(quantity) : current.quantity,
+    totalCost: totalCost !== undefined ? parseFloat(totalCost) : current.totalCost,
+    supplierName: supplierName ?? current.supplierName,
+    notes: notes ?? current.notes
+  };
+  const updated = db.ingredientPurchases[index];
+
+  // Update auto-logged expense
+  const expenseIndex = db.expenses.findIndex(e => e.id === `e_${updated.id}`);
+  if (expenseIndex !== -1) {
+    db.expenses[expenseIndex] = {
+      ...db.expenses[expenseIndex],
+      amount: updated.totalCost,
+      date: updated.purchaseDate,
+      description: `Purchased ${updated.quantity} ${rm.unit} of ${rm.name} @ total ₹${updated.totalCost}`
+    };
+  } else {
+    db.expenses.push({
+      id: `e_${updated.id}`,
+      category: 'Raw Materials',
+      amount: updated.totalCost,
+      date: updated.purchaseDate,
+      description: `Purchased ${updated.quantity} ${rm.unit} of ${rm.name} @ total ₹${updated.totalCost}`
+    });
+  }
+
+  // Apply new supplier adjustments
+  if (updated.supplierName) {
+    const newSupplier = db.suppliers.find(s => s.name.toLowerCase() === updated.supplierName.toLowerCase());
+    if (newSupplier) {
+      if (!newSupplier.purchaseHistory) newSupplier.purchaseHistory = [];
+      newSupplier.purchaseHistory.unshift({
+        date: updated.purchaseDate,
+        item: `${rm.name} (${updated.quantity} ${rm.unit})`,
+        amount: updated.totalCost
+      });
+      newSupplier.outstandingPayments = parseFloat((newSupplier.outstandingPayments + updated.totalCost).toFixed(2));
+    }
+  }
+
+  await commit();
+  res.json(updated);
+});
+
 app.delete('/api/admin/ingredient-purchases/:id', authenticateToken, async (req, res) => {
   const db = getDB();
   if (!db.ingredientPurchases) db.ingredientPurchases = [];

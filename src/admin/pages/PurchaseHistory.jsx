@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { ShoppingBag, Plus, AlertCircle, CheckCircle2, DollarSign, RefreshCw, Trash2, PieChart } from 'lucide-react';
+import { ShoppingBag, Plus, AlertCircle, CheckCircle2, DollarSign, RefreshCw, Trash2, Edit2 } from 'lucide-react';
 
 export default function PurchaseHistory() {
   const [purchases, setPurchases] = useState([]);
@@ -9,7 +9,8 @@ export default function PurchaseHistory() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Form State
+  // Form & Editing States
+  const [editId, setEditId] = useState(null);
   const [purchaseDate, setPurchaseDate] = useState('');
   const [rawMaterialId, setRawMaterialId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -35,6 +36,30 @@ export default function PurchaseHistory() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleEditClick = (p) => {
+    setEditId(p.id);
+    setPurchaseDate(p.purchaseDate);
+    setRawMaterialId(p.rawMaterialId);
+    setQuantity(p.quantity.toString());
+    setTotalCost(p.totalCost.toString());
+    setSupplierName(p.supplierName || '');
+    setNotes(p.notes || '');
+    setError('');
+    setSuccess('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditId(null);
+    setPurchaseDate('');
+    setRawMaterialId('');
+    setQuantity('');
+    setTotalCost('');
+    setSupplierName('');
+    setNotes('');
+    setError('');
+    setSuccess('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -68,20 +93,28 @@ export default function PurchaseHistory() {
         notes
       };
 
-      await api.ingredientPurchases.create(payload);
-      setSuccess('Purchase recorded successfully. Raw material stock updated.');
+      if (editId) {
+        await api.ingredientPurchases.update(editId, payload);
+        setSuccess('Purchase record updated successfully.');
+      } else {
+        await api.ingredientPurchases.create(payload);
+        setSuccess('Purchase recorded successfully. Raw material stock updated.');
+      }
       
       // Reset Form
+      setPurchaseDate('');
       setRawMaterialId('');
       setQuantity('');
       setTotalCost('');
       setSupplierName('');
       setNotes('');
+      setEditId(null);
       
-      // Reload
-      loadData();
+      // Reload UI state without page refresh
+      const pData = await api.ingredientPurchases.getAll();
+      setPurchases(pData.sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate)));
     } catch (err) {
-      setError(err.message || 'Failed to record purchase entry');
+      setError(err.message || 'Failed to save purchase entry');
     }
   };
 
@@ -144,7 +177,7 @@ export default function PurchaseHistory() {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm h-fit">
           <h3 className="text-base font-bold flex items-center gap-2 mb-4 border-b pb-2">
             <Plus className="w-5 h-5 text-saffron" />
-            <span>Add Purchase Record</span>
+            <span>{editId ? 'Modify Purchase Record' : 'Add Purchase Record'}</span>
           </h3>
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
@@ -238,12 +271,23 @@ export default function PurchaseHistory() {
               />
             </div>
 
-            <button
-              type="submit"
-              className="w-full py-3 bg-gradient-to-r from-saffron to-orange-500 text-white font-bold rounded-2xl hover:shadow active:scale-[0.98]"
-            >
-              Record Ingredient Purchase
-            </button>
+            <div className="space-y-2">
+              <button
+                type="submit"
+                className="w-full py-3 bg-gradient-to-r from-saffron to-orange-500 text-white font-bold rounded-2xl hover:shadow active:scale-[0.98]"
+              >
+                {editId ? 'Save Changes' : 'Record Ingredient Purchase'}
+              </button>
+              {editId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 font-bold rounded-xl transition-all animate-fade-in"
+                >
+                  Cancel Edit
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
@@ -257,7 +301,7 @@ export default function PurchaseHistory() {
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-xs text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-400 font-semibold uppercase tracking-wider">
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                   <th className="py-3 px-2">Purchase Date</th>
                   <th className="py-3 px-2">Ingredient</th>
                   <th className="py-3 px-2 text-right">Quantity</th>
@@ -279,7 +323,7 @@ export default function PurchaseHistory() {
                     return (
                       <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">
                         <td className="py-3 px-2 font-semibold">{p.purchaseDate}</td>
-                        <td className="py-3 px-2 font-black text-slate-700 dark:text-slate-300">
+                        <td className="py-3 px-2 font-black text-slate-700 dark:text-slate-350">
                           {rm ? rm.name : 'Unknown Ingredient'}
                         </td>
                         <td className="py-3 px-2 text-right font-semibold">
@@ -290,12 +334,20 @@ export default function PurchaseHistory() {
                           <div className="font-semibold text-slate-700 dark:text-slate-300">{p.supplierName || '—'}</div>
                           <div className="text-[10px] text-slate-400">{p.notes}</div>
                         </td>
-                        <td className="py-3 px-2 text-center">
+                        <td className="py-3 px-2 text-center flex justify-center items-center gap-1.5">
+                          <button
+                            onClick={() => handleEditClick(p)}
+                            className="p-1.5 text-slate-400 hover:text-saffron hover:bg-saffron/10 rounded-xl transition-colors"
+                            title="Edit Purchase Record"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => handleDelete(p.id)}
-                            className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-500/10"
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
+                            title="Delete Purchase Record"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
                       </tr>
