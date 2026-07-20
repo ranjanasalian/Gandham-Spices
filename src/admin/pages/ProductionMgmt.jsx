@@ -62,6 +62,20 @@ export default function ProductionMgmt() {
     }
   }, [productId, recipes, products]);
 
+  // Sync auto-calculate production cost when product or packet count changes
+  useEffect(() => {
+    if (productId && packetsProduced) {
+      const prod = products.find(p => p.id === productId);
+      if (prod) {
+        const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
+        const count = parseInt(packetsProduced, 10);
+        if (!isNaN(costPerPack) && !isNaN(count) && count > 0) {
+          setManufacturingCost((costPerPack * count).toFixed(2));
+        }
+      }
+    }
+  }, [productId, packetsProduced, products]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
