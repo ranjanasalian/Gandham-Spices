@@ -14,6 +14,29 @@ app.use(express.json());
 // Helper: Parse Date baseline (always defaulting to 2026-07-20 for realistic dashboard stats)
 const getBaselineDate = () => new Date('2026-07-20');
 
+// Helper: Parse Pack Size String (e.g. "100g", "1kg") to Kilograms
+function parsePackSizeToKg(packSizeStr) {
+  if (!packSizeStr) return 0.1; // default to 100g
+  const clean = packSizeStr.toLowerCase().replace(/\s+/g, '');
+  const num = parseFloat(clean);
+  if (isNaN(num)) return 0.1;
+  if (clean.endsWith('kg')) return num;
+  if (clean.endsWith('g') || clean.endsWith('grams') || clean.endsWith('gm')) return num / 1000;
+  return num / 1000; // default assumption grams
+}
+
+// Helper: Convert units between kg and grams
+function convertUnit(qty, fromUnit, toUnit) {
+  if (!fromUnit || !toUnit || fromUnit.toLowerCase() === toUnit.toLowerCase()) {
+    return qty;
+  }
+  const f = fromUnit.toLowerCase();
+  const t = toUnit.toLowerCase();
+  if (f === 'grams' && t === 'kg') return qty / 1000;
+  if (f === 'kg' && t === 'grams') return qty * 1000;
+  return qty;
+}
+
 // Authentication Middleware
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -606,7 +629,10 @@ app.get('/api/admin/raw-materials', authenticateToken, (req, res) => {
       if (recipe) {
         const ing = recipe.ingredients.find(i => i.rawMaterialId === rm.id);
         if (ing) {
-          totalUsed += (ing.quantity / recipe.yieldQuantity) * b.packetsProduced;
+          const product = db.products.find(p => p.id === recipe.productId);
+          const packSizeKg = parsePackSizeToKg(product ? product.packSize : '');
+          const qtyInRmUnit = convertUnit(ing.quantity, ing.unit || 'kg', rm.unit);
+          totalUsed += qtyInRmUnit * b.packetsProduced * packSizeKg;
         }
       }
     });
@@ -748,12 +774,17 @@ app.post('/api/admin/batches', authenticateToken, async (req, res) => {
         if (r) {
           const rIng = r.ingredients.find(ri => ri.rawMaterialId === rm.id);
           if (rIng) {
-            totalUsed += (rIng.quantity / r.yieldQuantity) * b.packetsProduced;
+            const prod = db.products.find(p => p.id === r.productId);
+            const pSizeKg = parsePackSizeToKg(prod ? prod.packSize : '');
+            const rIngQtyInRmUnit = convertUnit(rIng.quantity, rIng.unit || 'kg', rm.unit);
+            totalUsed += rIngQtyInRmUnit * b.packetsProduced * pSizeKg;
           }
         }
       });
       const currentStock = totalPurchased - totalUsed;
-      const needed = (ing.quantity / recipe.yieldQuantity) * packetsCount;
+      const ingQtyInRmUnit = convertUnit(ing.quantity, ing.unit || 'kg', rm.unit);
+      const packSizeKg = parsePackSizeToKg(product ? product.packSize : '');
+      const needed = ingQtyInRmUnit * packetsCount * packSizeKg;
 
       if (currentStock < needed) {
         missingMaterials.push(`Insufficient stock for ${rm.name}. Needed: ${needed.toFixed(3)} ${rm.unit}, Current: ${currentStock.toFixed(3)} ${rm.unit}`);
@@ -1520,7 +1551,10 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
           if (recipe) {
             const ing = recipe.ingredients.find(i => i.rawMaterialId === rm.id);
             if (ing) {
-              totalUsed += (ing.quantity / recipe.yieldQuantity) * b.packetsProduced;
+              const product = db.products.find(p => p.id === recipe.productId);
+              const packSizeKg = parsePackSizeToKg(product ? product.packSize : '');
+              const qtyInRmUnit = convertUnit(ing.quantity, ing.unit || 'kg', rm.unit);
+              totalUsed += qtyInRmUnit * b.packetsProduced * packSizeKg;
             }
           }
         });
@@ -1545,7 +1579,10 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
             if (recipe) {
               const ing = recipe.ingredients.find(i => i.rawMaterialId === rm.id);
               if (ing) {
-                totalUsed += (ing.quantity / recipe.yieldQuantity) * b.packetsProduced;
+                const product = db.products.find(p => p.id === recipe.productId);
+                const packSizeKg = parsePackSizeToKg(product ? product.packSize : '');
+                const qtyInRmUnit = convertUnit(ing.quantity, ing.unit || 'kg', rm.unit);
+                totalUsed += qtyInRmUnit * b.packetsProduced * packSizeKg;
               }
             }
           });

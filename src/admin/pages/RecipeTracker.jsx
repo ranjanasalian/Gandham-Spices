@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { FlaskConical, Plus, Edit2, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Trash2, ListPlus } from 'lucide-react';
+import { FlaskConical, Plus, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Trash2, ListPlus } from 'lucide-react';
 
 export default function RecipeTracker() {
   const [recipes, setRecipes] = useState([]);
@@ -15,8 +15,7 @@ export default function RecipeTracker() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [recipeName, setRecipeName] = useState('');
   const [productId, setProductId] = useState('');
-  const [yieldQuantity, setYieldQuantity] = useState('100');
-  const [notes, setNotes] = useState('');
+  const [yieldQuantity] = useState('1'); // Default base yield is 1 kg of powder
   const [recipeIngredients, setRecipeIngredients] = useState([
     { rawMaterialId: '', quantity: '', unit: 'kg' }
   ]);
@@ -55,10 +54,10 @@ export default function RecipeTracker() {
     setRecipeIngredients(prev => {
       const copy = [...prev];
       copy[idx][field] = val;
-      // auto set unit based on raw material select
+      // auto set unit based on raw material select if they pick rawMaterialId
       if (field === 'rawMaterialId') {
         const rm = rawMaterials.find(r => r.id === val);
-        if (rm) copy[idx].unit = rm.unit;
+        if (rm) copy[idx].unit = rm.unit === 'grams' ? 'grams' : 'kg';
       }
       return copy;
     });
@@ -78,8 +77,8 @@ export default function RecipeTracker() {
       const recipePayload = {
         name: recipeName,
         productId,
-        yieldQuantity: parseInt(yieldQuantity, 10),
-        notes,
+        yieldQuantity: parseFloat(yieldQuantity),
+        notes: '', // Notes/Method removed from UI
         ingredients: recipeIngredients.map(ing => ({
           rawMaterialId: ing.rawMaterialId,
           quantity: parseFloat(ing.quantity),
@@ -94,7 +93,6 @@ export default function RecipeTracker() {
       // Reset Form
       setRecipeName('');
       setProductId('');
-      setNotes('');
       setRecipeIngredients([{ rawMaterialId: '', quantity: '', unit: 'kg' }]);
 
       // Reload
@@ -184,7 +182,7 @@ export default function RecipeTracker() {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Ingredients Breakdown (Per Batch Yield) *</label>
+                <label className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Ingredients Breakdown (For 1 kg powder yield) *</label>
                 <div className="space-y-2">
                   {recipeIngredients.map((ing, idx) => (
                     <div key={idx} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/40 p-2 rounded-2xl border border-slate-100 dark:border-slate-800">
@@ -208,7 +206,15 @@ export default function RecipeTracker() {
                         onChange={(e) => handleIngredientChange(idx, 'quantity', e.target.value)}
                         className="w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2 rounded-xl text-center focus:outline-none"
                       />
-                      <span className="w-12 text-slate-400 font-bold text-center">{ing.unit}</span>
+                      <select
+                        aria-label="Raw material unit select"
+                        value={ing.unit}
+                        onChange={(e) => handleIngredientChange(idx, 'unit', e.target.value)}
+                        className="w-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2 rounded-xl focus:outline-none"
+                      >
+                        <option value="kg">kg</option>
+                        <option value="grams">grams</option>
+                      </select>
                       <button
                         type="button"
                         onClick={() => handleRemoveIngredientRow(idx)}
@@ -229,23 +235,11 @@ export default function RecipeTracker() {
                 </button>
               </div>
 
-              <div>
-                <label htmlFor="recipe-notes-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Method / Roasting Instructions</label>
-                <textarea
-                  id="recipe-notes-input"
-                  placeholder="Steps to roast, grind and preserve..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows="3"
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:ring-1 focus:ring-saffron focus:outline-none"
-                />
-              </div>
-
               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setEditorOpen(false)}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-saffron hover:text-white dark:hover:bg-saffron dark:hover:text-white text-slate-600 dark:text-slate-300 font-bold rounded-xl transition-all"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-saffron hover:text-white dark:hover:bg-saffron dark:hover:text-white text-slate-600 dark:text-slate-350 font-bold rounded-xl transition-all"
                 >
                   Cancel
                 </button>
@@ -293,7 +287,7 @@ export default function RecipeTracker() {
                   <div className="space-y-2">
                     <h5 className="font-bold text-slate-500 uppercase tracking-wider text-[10px] flex items-center gap-1">
                       <ListPlus className="w-3.5 h-3.5 text-saffron" />
-                      <span>Formula ingredient ratios (Per Batch Yield)</span>
+                      <span>Formula ingredient ratios (For 1 kg powder yield)</span>
                     </h5>
                     <div className="border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                       <table className="w-full text-[11px] text-left">
@@ -317,13 +311,6 @@ export default function RecipeTracker() {
                       </table>
                     </div>
                   </div>
-
-                  {recipe.notes && (
-                    <div className="space-y-1 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 text-[11px]">
-                      <p className="font-bold text-slate-500">Method Instructions:</p>
-                      <p className="text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">{recipe.notes}</p>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
