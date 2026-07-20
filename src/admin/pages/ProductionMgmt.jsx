@@ -303,8 +303,10 @@ export default function ProductionMgmt() {
             </div>
 
             <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl flex justify-between items-center text-xs">
-              <span className="font-semibold text-slate-500">Cost Per Packet:</span>
-              <span className="font-black text-saffron text-sm">₹{calculatedCostPerPacket()}</span>
+              <span className="font-semibold text-slate-500">Cost per Pouch (MRP):</span>
+              <span className="font-black text-saffron text-sm">
+                ₹{products.find(p => p.id === productId) ? parseFloat(products.find(p => p.id === productId).mrp || 0).toFixed(2) : '0.00'}
+              </span>
             </div>
 
             <div>
