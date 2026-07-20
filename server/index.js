@@ -74,12 +74,145 @@ app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
 
 // ---------------- STATS & CHARTS ROUTE ----------------
 app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
-  const { range, startDate, endDate } = req.query;
   const db = getDB();
+  const baseline = new Date();
+  const todayStr = baseline.toISOString().split('T')[0];
 
-  // Baseline is 2026-07-20
-  const baseline = getBaselineDate();
+  const getStartOfWeek = (d) => {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+  };
+
+  const getStartOfMonth = (d) => {
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  };
+
+  const todayEnd = new Date(baseline);
+  todayEnd.setHours(23,59,59,999);
+
+  const weekStart = getStartOfWeek(baseline);
+  weekStart.setHours(0,0,0,0);
+  const monthStart = getStartOfMonth(baseline);
+  monthStart.setHours(0,0,0,0);
+
+  // 1. TODAY STATS
+  const todaySales = db.sales.filter(s => s.date === todayStr);
+  const todayCustomerSales = (db.customers || []).filter(c => c.date === todayStr);
+  const todayBatches = db.batches.filter(b => b.manufacturingDate === todayStr);
   
+  const todayProduced = todayBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
+  const todaySold = todaySales.reduce((sum, s) => sum + s.quantityGiven, 0) + 
+                    todayCustomerSales.reduce((sum, c) => sum + (c.quantityGiven || 0), 0);
+  const todayRevenue = todaySales.reduce((sum, s) => sum + s.totalAmountReceivable, 0) + 
+                      todayCustomerSales.reduce((sum, c) => sum + (c.totalAmountReceivable || 0), 0);
+
+  // 2. THIS WEEK STATS
+  const isInWeek = (dateStr) => {
+    const d = new Date(dateStr);
+    return d >= weekStart && d <= todayEnd;
+  };
+  const weekSales = db.sales.filter(s => isInWeek(s.date));
+  const weekCustomerSales = (db.customers || []).filter(c => isInWeek(c.date));
+  const weekBatches = db.batches.filter(b => isInWeek(b.manufacturingDate));
+
+  const weekProduced = weekBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
+  const weekSold = weekSales.reduce((sum, s) => sum + s.quantityGiven, 0) + 
+                  weekCustomerSales.reduce((sum, c) => sum + (c.quantityGiven || 0), 0);
+  const weekRevenue = weekSales.reduce((sum, s) => sum + s.totalAmountReceivable, 0) + 
+                      weekCustomerSales.reduce((sum, c) => sum + (c.totalAmountReceivable || 0), 0);
+  
+  let weekCostOfGoods = 0;
+  weekSales.forEach(s => {
+    const prod = db.products.find(p => p.id === s.productId);
+    const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+    weekCostOfGoods += s.quantityGiven * cost;
+  });
+  weekCustomerSales.forEach(c => {
+    const prod = db.products.find(p => p.id === c.productId);
+    const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+    weekCostOfGoods += (c.quantityGiven || 0) * cost;
+  });
+  const weekProfit = weekRevenue - weekCostOfGoods;
+
+  // 3. THIS MONTH STATS
+  const currentMonthStr = todayStr.substring(0, 7);
+  const isInMonth = (dateStr) => dateStr.startsWith(currentMonthStr);
+
+  const monthSales = db.sales.filter(s => isInMonth(s.date));
+  const monthCustomerSales = (db.customers || []).filter(c => isInMonth(c.date));
+  const monthBatches = db.batches.filter(b => isInMonth(b.manufacturingDate));
+  const monthExpenses = db.expenses.filter(e => isInMonth(e.date));
+  const monthPurchases = (db.ingredientPurchases || []).filter(p => isInMonth(p.purchaseDate));
+
+  const monthRevenue = monthSales.reduce((sum, s) => sum + s.totalAmountReceivable, 0) + 
+                       monthCustomerSales.reduce((sum, c) => sum + (c.totalAmountReceivable || 0), 0);
+  const monthExpenseTotal = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const monthPurchaseTotal = monthPurchases.reduce((sum, p) => sum + p.totalCost, 0);
+  const monthProduced = monthBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
+  const monthSold = monthSales.reduce((sum, s) => sum + s.quantityGiven, 0) + 
+                    monthCustomerSales.reduce((sum, c) => sum + (c.quantityGiven || 0), 0);
+
+  let monthCostOfGoods = 0;
+  monthSales.forEach(s => {
+    const prod = db.products.find(p => p.id === s.productId);
+    const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+    monthCostOfGoods += s.quantityGiven * cost;
+  });
+  monthCustomerSales.forEach(c => {
+    const prod = db.products.find(p => p.id === c.productId);
+    const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+    monthCostOfGoods += (c.quantityGiven || 0) * cost;
+  });
+  const monthGrossProfit = monthRevenue - monthCostOfGoods;
+  const monthNetProfit = monthGrossProfit - monthExpenseTotal;
+
+  // Inventory Totals
+  const currentInventory = db.products.reduce((acc, p) => {
+    const productBatches = db.batches.filter(b => b.productId === p.id);
+    const totalProduced = productBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
+    const productSales = db.sales.filter(s => s.productId === p.id);
+    const customerSales = (db.customers || []).filter(c => c.productId === p.id);
+    const totalSold = productSales.reduce((sum, s) => sum + s.quantityGiven, 0) + 
+                      customerSales.reduce((sum, c) => sum + (c.quantityGiven || 0), 0);
+    return acc + (totalProduced - totalSold);
+  }, 0);
+
+  const pendingPayments = db.pendingPayments
+    .filter(p => p.status === 'Pending')
+    .reduce((acc, p) => acc + p.pendingAmount, 0);
+
+  const lowStockMaterials = db.rawMaterials.filter(rm => {
+    const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
+    const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
+    let totalUsed = 0;
+    db.batches.forEach(b => {
+      const r = db.recipes.find(rec => rec.id === b.recipeId);
+      if (r) {
+        const rIng = r.ingredients.find(ri => ri.rawMaterialId === rm.id);
+        if (rIng) {
+          totalUsed += (rIng.quantity / r.yieldQuantity) * b.packetsProduced;
+        }
+      }
+    });
+    const currentStock = totalPurchased - totalUsed;
+    return currentStock < rm.minStockLevel;
+  }).length;
+
+  const lowStockProducts = db.products.filter(p => {
+    const productBatches = db.batches.filter(b => b.productId === p.id);
+    const totalProduced = productBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
+    const productSales = db.sales.filter(s => s.productId === p.id);
+    const totalSold = productSales.reduce((sum, s) => sum + s.quantityGiven, 0);
+    const currentStock = totalProduced - totalSold;
+    return currentStock < 20;
+  }).length;
+
+  const lowStockAlerts = lowStockMaterials + lowStockProducts;
+
+  // 4. CHART TREND DATA
+  const { range, startDate, endDate } = req.query;
   let start = new Date(baseline);
   let end = new Date(baseline);
 
@@ -89,99 +222,20 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
   } else if (range === 'week') {
     start.setDate(baseline.getDate() - 6);
     start.setHours(0,0,0,0);
-    end.setHours(23,59,59,999);
   } else if (range === 'month') {
     start.setDate(1);
     start.setHours(0,0,0,0);
-    end.setHours(23,59,59,999);
   } else if (range === 'year') {
     start.setMonth(0, 1);
     start.setHours(0,0,0,0);
-    end.setHours(23,59,59,999);
   } else if (range === 'custom' && startDate && endDate) {
     start = new Date(startDate);
     end = new Date(endDate);
-    end.setHours(23,59,59,999);
   } else {
-    // Default to 'week' if unspecified
     start.setDate(baseline.getDate() - 6);
     start.setHours(0,0,0,0);
   }
 
-  const isInRange = (dateStr) => {
-    const d = new Date(dateStr);
-    return d >= start && d <= end;
-  };
-
-  // Filter lists based on date
-  const filteredSales = db.sales.filter(s => isInRange(s.date));
-  const filteredDeliveries = db.deliveries.filter(d => isInRange(d.deliveryDate));
-  const filteredBatches = db.batches.filter(b => isInRange(b.manufacturingDate));
-  const filteredExpenses = db.expenses.filter(e => isInRange(e.date));
-  const filteredOrders = db.orders.filter(o => isInRange(o.orderDate));
-
-  // 1. Products Manufactured Today (Count of packets)
-  const productsManufactured = filteredBatches.reduce((acc, b) => acc + b.packetsProduced, 0);
-
-  // 2. Products Sold Today (Count of packets)
-  const productsSold = filteredSales.reduce((acc, s) => {
-    return acc + s.items.reduce((sum, item) => sum + item.quantity, 0);
-  }, 0);
-
-  // 3. Products Delivered Today
-  const productsDelivered = filteredDeliveries
-    .filter(d => d.status === 'Delivered')
-    .reduce((acc, d) => acc + d.quantity, 0);
-
-  // 4. Current Inventory (sum of stock of finished goods)
-  const currentInventory = db.products.reduce((acc, p) => acc + p.currentStock, 0);
-
-  // 5. Total Revenue
-  const totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
-
-  // 6. Expenses
-  const totalExpenses = filteredExpenses.reduce((acc, e) => acc + e.amount, 0);
-
-  // 7. Total Profit
-  // Profit = Revenue - Cost Price of items sold.
-  // Net Profit = Profit - Other Expenses.
-  let grossProfit = 0;
-  filteredSales.forEach(s => {
-    s.items.forEach(item => {
-      const prod = db.products.find(p => p.id === item.productId);
-      const cost = prod ? prod.costPrice : 0;
-      grossProfit += (item.sellingPrice - cost) * item.quantity;
-    });
-  });
-  const totalProfit = Math.max(0, grossProfit - totalExpenses);
-
-  // 8. Pending Payments (unpaid outstanding invoices)
-  const pendingPayments = db.pendingPayments
-    .filter(p => p.status === 'Pending')
-    .reduce((acc, p) => acc + p.pendingAmount, 0);
-
-  // 9. Total Customers
-  const totalCustomers = db.customers.length;
-
-  // 10. Total Shops (Wholesalers, Retailers, Distributors)
-  const totalShops = db.customers.filter(c => c.customerType !== 'Direct Customer').length;
-
-  // 11. Orders Received
-  const ordersReceived = filteredOrders.length;
-
-  // 12. Orders Delivered (in stage Delivered or Paid)
-  const ordersDelivered = filteredOrders.filter(o => o.status === 'Delivered' || o.status === 'Paid').length;
-
-  // 13. Low Stock Alerts
-  const lowStockMaterials = db.rawMaterials.filter(rm => rm.currentStock < rm.minStockLevel).length;
-  const lowStockProducts = db.products.filter(p => p.currentStock < 20).length;
-  const lowStockAlerts = lowStockMaterials + lowStockProducts;
-
-  // Recent Activities
-  const recentActivities = db.recentActivities.slice(0, 8);
-
-  // ---------------- CHART DATA GENERATION ----------------
-  // Generate daily points for the last N days
   const dateMap = {};
   const tempDate = new Date(start);
   while (tempDate <= end) {
@@ -190,95 +244,144 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
     tempDate.setDate(tempDate.getDate() + 1);
   }
 
-  // Populate sales & revenue
-  filteredSales.forEach(s => {
+  const rangeSales = db.sales.filter(s => {
+    const d = new Date(s.date);
+    return d >= start && d <= end;
+  });
+
+  rangeSales.forEach(s => {
     const key = s.date;
     if (dateMap[key]) {
-      dateMap[key].revenue += s.totalAmount;
-      dateMap[key].sales += s.items.reduce((sum, item) => sum + item.quantity, 0);
+      dateMap[key].revenue += s.totalAmountReceivable;
+      dateMap[key].sales += s.quantityGiven;
       
-      let saleProfit = 0;
-      s.items.forEach(item => {
-        const prod = db.products.find(p => p.id === item.productId);
-        const cost = prod ? prod.costPrice : 0;
-        saleProfit += (item.sellingPrice - cost) * item.quantity;
-      });
-      dateMap[key].profit += saleProfit;
+      const prod = db.products.find(p => p.id === s.productId);
+      const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+      const profit = s.totalAmountReceivable - (s.quantityGiven * cost);
+      dateMap[key].profit += profit;
     }
   });
 
-  const chartData = Object.values(dateMap).sort((a,b) => a.date.localeCompare(b.date));
+  const dailyTrends = Object.values(dateMap).sort((a,b) => a.date.localeCompare(b.date));
 
   // Product performance chart data (Top selling products)
-  const productSales = {};
+  const productSalesMap = {};
   db.products.forEach(p => {
-    productSales[p.id] = { name: p.name, quantity: 0, revenue: 0 };
+    productSalesMap[p.id] = { name: p.name, quantity: 0, revenue: 0, profit: 0 };
   });
 
-  filteredSales.forEach(s => {
-    s.items.forEach(item => {
-      if (productSales[item.productId]) {
-        productSales[item.productId].quantity += item.quantity;
-        productSales[item.productId].revenue += item.totalAmount;
-      }
-    });
+  rangeSales.forEach(s => {
+    if (productSalesMap[s.productId]) {
+      productSalesMap[s.productId].quantity += s.quantityGiven;
+      productSalesMap[s.productId].revenue += s.totalAmountReceivable;
+      
+      const prod = db.products.find(p => p.id === s.productId);
+      const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+      const profit = s.totalAmountReceivable - (s.quantityGiven * cost);
+      productSalesMap[s.productId].profit += profit;
+    }
   });
-  const productPerformance = Object.values(productSales).sort((a,b) => b.revenue - a.revenue);
+  const productPerformance = Object.values(productSalesMap).sort((a,b) => b.revenue - a.revenue);
 
   // Inventory breakdown data
-  const inventoryData = db.products.map(p => ({
-    name: p.name,
-    stock: p.currentStock
-  }));
+  const inventoryData = db.products.map(p => {
+    const productBatches = db.batches.filter(b => b.productId === p.id);
+    const totalProduced = productBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
+    const productSales = db.sales.filter(s => s.productId === p.id);
+    const totalSold = productSales.reduce((sum, s) => sum + s.quantityGiven, 0);
+    return {
+      name: p.name,
+      stock: totalProduced - totalSold
+    };
+  });
 
   res.json({
     summary: {
-      productsManufactured,
-      productsSold,
-      productsDelivered,
+      today: { productsProduced: todayProduced, productsSold: todaySold, revenue: todayRevenue },
+      thisWeek: { production: weekProduced, sales: weekSold, revenue: weekRevenue, profit: weekProfit },
+      thisMonth: { 
+        revenue: monthRevenue, 
+        netProfit: monthNetProfit, 
+        expenses: monthExpenseTotal, 
+        ingredientPurchases: monthPurchaseTotal, 
+        productionQty: monthProduced, 
+        pouchesSold: monthSold 
+      },
       currentInventory,
-      totalRevenue,
-      totalProfit,
-      totalExpenses,
-      pendingPayments,
-      totalCustomers,
-      totalShops,
-      ordersReceived,
-      ordersDelivered,
-      lowStockAlerts
+      lowStockAlerts,
+      pendingPayments
     },
     charts: {
-      dailyTrends: chartData,
+      dailyTrends,
       productPerformance,
       inventoryData
     },
-    recentActivities
+    recentActivities: db.recentActivities.slice(0, 8)
   });
 });
 
 
 // ---------------- PRODUCTS CRUD ----------------
 app.get('/api/admin/products', authenticateToken, (req, res) => {
-  res.json(getDB().products);
-});
+  const db = getDB();
+  db.products.forEach(p => {
+    const productBatches = db.batches.filter(b => b.productId === p.id);
+    const totalProduced = productBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
 
-app.post('/api/auth/register-dummy', async (req, res) => {
-  // Utility for testing
-  res.status(404).json({ message: 'Registration disabled' });
+    const productSales = db.sales.filter(s => s.productId === p.id);
+    const customerSales = (db.customers || []).filter(c => c.productId === p.id);
+    const totalSold = productSales.reduce((sum, s) => sum + s.quantityGiven, 0) + 
+                      customerSales.reduce((sum, c) => sum + (c.quantityGiven || 0), 0);
+
+    p.totalProduced = totalProduced;
+    p.totalSold = totalSold;
+    p.currentStock = totalProduced - totalSold;
+
+    const mrpValue = parseFloat(p.mrp || 0);
+    const margin = parseFloat(p.retailerMargin || 0);
+    const cost = parseFloat(p.productionCost || p.costPrice || 0);
+    p.wholesalePrice = parseFloat((mrpValue * (1 - margin / 100)).toFixed(2));
+    p.netProfit = parseFloat((p.wholesalePrice - cost).toFixed(2));
+    p.netMargin = p.wholesalePrice > 0 ? parseFloat(((p.netProfit / p.wholesalePrice) * 100).toFixed(2)) : 0;
+  });
+  res.json(db.products);
 });
 
 app.post('/api/admin/products', authenticateToken, async (req, res) => {
   const db = getDB();
+  const { name, sku, category, mrp, retailerMargin, productionCost, status, packSize } = req.body;
+  
+  const mrpValue = parseFloat(mrp || 0);
+  const margin = parseFloat(retailerMargin || 0);
+  const cost = parseFloat(productionCost || 0);
+  
+  const wholesalePrice = mrpValue * (1 - margin / 100);
+  const netProfit = wholesalePrice - cost;
+  const netMargin = wholesalePrice > 0 ? (netProfit / wholesalePrice) * 100 : 0;
+
   const newProduct = {
     id: `prod_${Date.now()}`,
-    ...req.body
+    sku: sku || `SKU-${Date.now()}`,
+    name,
+    category: category || 'General',
+    mrp: mrpValue,
+    retailerMargin: margin,
+    wholesalePrice: parseFloat(wholesalePrice.toFixed(2)),
+    productionCost: cost,
+    costPrice: cost,
+    netProfit: parseFloat(netProfit.toFixed(2)),
+    netMargin: parseFloat(netMargin.toFixed(2)),
+    currentStock: 0,
+    status: status || 'Active',
+    packSize: packSize || '100g'
   };
+
   db.products.push(newProduct);
   
   db.recentActivities.unshift({
     id: `a_${Date.now()}`,
     action: 'Added Product',
-    details: `Added new product ${newProduct.name} (SKU: ${newProduct.sku})`,
+    details: `Added product ${newProduct.name} to registry`,
     timestamp: new Date().toISOString()
   });
 
@@ -291,14 +394,25 @@ app.put('/api/admin/products/:id', authenticateToken, async (req, res) => {
   const index = db.products.findIndex(p => p.id === req.params.id);
   if (index === -1) return res.status(404).json({ message: 'Product not found' });
 
-  db.products[index] = { ...db.products[index], ...req.body };
+  const mrpValue = parseFloat(req.body.mrp ?? db.products[index].mrp);
+  const margin = parseFloat(req.body.retailerMargin ?? db.products[index].retailerMargin ?? 0);
+  const cost = parseFloat(req.body.productionCost ?? db.products[index].productionCost ?? db.products[index].costPrice ?? 0);
 
-  db.recentActivities.unshift({
-    id: `a_${Date.now()}`,
-    action: 'Updated Product',
-    details: `Updated details for ${db.products[index].name}`,
-    timestamp: new Date().toISOString()
-  });
+  const wholesalePrice = mrpValue * (1 - margin / 100);
+  const netProfit = wholesalePrice - cost;
+  const netMargin = wholesalePrice > 0 ? (netProfit / wholesalePrice) * 100 : 0;
+
+  db.products[index] = { 
+    ...db.products[index], 
+    ...req.body,
+    mrp: mrpValue,
+    retailerMargin: margin,
+    wholesalePrice: parseFloat(wholesalePrice.toFixed(2)),
+    productionCost: cost,
+    costPrice: cost,
+    netProfit: parseFloat(netProfit.toFixed(2)),
+    netMargin: parseFloat(netMargin.toFixed(2))
+  };
 
   await commit();
   res.json(db.products[index]);
@@ -310,7 +424,6 @@ app.delete('/api/admin/products/:id', authenticateToken, async (req, res) => {
   if (index === -1) return res.status(404).json({ message: 'Product not found' });
 
   const deleted = db.products.splice(index, 1)[0];
-
   db.recentActivities.unshift({
     id: `a_${Date.now()}`,
     action: 'Deleted Product',
@@ -323,17 +436,128 @@ app.delete('/api/admin/products/:id', authenticateToken, async (req, res) => {
 });
 
 
+// ---------------- INGREDIENT PURCHASES CRUD ----------------
+app.get('/api/admin/ingredient-purchases', authenticateToken, (req, res) => {
+  res.json(getDB().ingredientPurchases || []);
+});
+
+app.post('/api/admin/ingredient-purchases', authenticateToken, async (req, res) => {
+  const db = getDB();
+  const { purchaseDate, rawMaterialId, quantity, totalCost, supplierName, notes } = req.body;
+  
+  if (!purchaseDate || !rawMaterialId || !quantity || !totalCost) {
+    return res.status(400).json({ message: 'Missing required purchase fields' });
+  }
+
+  const rm = db.rawMaterials.find(m => m.id === rawMaterialId);
+  if (!rm) return res.status(404).json({ message: 'Raw material type not found' });
+
+  const newPurchase = {
+    id: `ip_${Date.now()}`,
+    purchaseDate,
+    rawMaterialId,
+    quantity: parseFloat(quantity),
+    totalCost: parseFloat(totalCost),
+    supplierName: supplierName || '',
+    notes: notes || ''
+  };
+
+  if (!db.ingredientPurchases) db.ingredientPurchases = [];
+  db.ingredientPurchases.push(newPurchase);
+
+  // Auto-log expense
+  db.expenses.push({
+    id: `e_${newPurchase.id}`,
+    category: 'Raw Materials',
+    amount: parseFloat(totalCost),
+    date: purchaseDate,
+    description: `Purchased ${quantity} ${rm.unit} of ${rm.name} @ total ₹${totalCost}`
+  });
+
+  // Log supplier purchase history if supplierName matches a registered supplier
+  if (supplierName) {
+    const supplier = db.suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
+    if (supplier) {
+      if (!supplier.purchaseHistory) supplier.purchaseHistory = [];
+      supplier.purchaseHistory.unshift({
+        date: purchaseDate,
+        item: `${rm.name} (${quantity} ${rm.unit})`,
+        amount: parseFloat(totalCost)
+      });
+      supplier.outstandingPayments = parseFloat((supplier.outstandingPayments + parseFloat(totalCost)).toFixed(2));
+    }
+  }
+
+  db.recentActivities.unshift({
+    id: `a_${Date.now()}`,
+    action: 'Purchased Ingredient',
+    details: `Purchased ${quantity} ${rm.unit} of ${rm.name} for ₹${totalCost}.`,
+    timestamp: new Date().toISOString()
+  });
+
+  await commit();
+  res.status(201).json(newPurchase);
+});
+
+app.delete('/api/admin/ingredient-purchases/:id', authenticateToken, async (req, res) => {
+  const db = getDB();
+  if (!db.ingredientPurchases) db.ingredientPurchases = [];
+  const index = db.ingredientPurchases.findIndex(p => p.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Purchase record not found' });
+
+  const deleted = db.ingredientPurchases.splice(index, 1)[0];
+
+  // Clean up auto-expense
+  db.expenses = db.expenses.filter(e => e.id !== `e_${deleted.id}`);
+
+  // Deduct from supplier history
+  if (deleted.supplierName) {
+    const supplier = db.suppliers.find(s => s.name.toLowerCase() === deleted.supplierName.toLowerCase());
+    if (supplier) {
+      supplier.purchaseHistory = (supplier.purchaseHistory || []).filter(h => !(h.date === deleted.purchaseDate && h.amount === deleted.totalCost));
+      supplier.outstandingPayments = Math.max(0, parseFloat((supplier.outstandingPayments - deleted.totalCost).toFixed(2)));
+    }
+  }
+
+  await commit();
+  res.json(deleted);
+});
+
 // ---------------- RAW MATERIALS CRUD ----------------
 app.get('/api/admin/raw-materials', authenticateToken, (req, res) => {
-  res.json(getDB().rawMaterials);
+  const db = getDB();
+  db.rawMaterials.forEach(rm => {
+    const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
+    const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
+
+    let totalUsed = 0;
+    db.batches.forEach(b => {
+      const recipe = db.recipes.find(r => r.id === b.recipeId);
+      if (recipe) {
+        const ing = recipe.ingredients.find(i => i.rawMaterialId === rm.id);
+        if (ing) {
+          totalUsed += (ing.quantity / recipe.yieldQuantity) * b.packetsProduced;
+        }
+      }
+    });
+
+    rm.totalPurchased = totalPurchased;
+    rm.totalUsed = parseFloat(totalUsed.toFixed(3));
+    rm.currentStock = parseFloat((totalPurchased - totalUsed).toFixed(3));
+  });
+  res.json(db.rawMaterials);
 });
 
 app.post('/api/admin/raw-materials', authenticateToken, async (req, res) => {
   const db = getDB();
   const newMaterial = {
     id: `rm_${Date.now()}`,
-    ...req.body,
-    currentStock: parseFloat(req.body.currentStock || 0)
+    name: req.body.name,
+    unit: req.body.unit || 'kg',
+    minStockLevel: parseFloat(req.body.minStockLevel || 0),
+    currentStock: 0,
+    totalPurchased: 0,
+    totalUsed: 0
   };
   db.rawMaterials.push(newMaterial);
 
@@ -355,70 +579,13 @@ app.put('/api/admin/raw-materials/:id', authenticateToken, async (req, res) => {
 
   db.rawMaterials[index] = { 
     ...db.rawMaterials[index], 
-    ...req.body,
-    currentStock: parseFloat(req.body.currentStock ?? db.rawMaterials[index].currentStock)
+    name: req.body.name ?? db.rawMaterials[index].name,
+    unit: req.body.unit ?? db.rawMaterials[index].unit,
+    minStockLevel: parseFloat(req.body.minStockLevel ?? db.rawMaterials[index].minStockLevel)
   };
 
   await commit();
   res.json(db.rawMaterials[index]);
-});
-
-// Record Purchase and auto-create Expense
-app.post('/api/admin/raw-materials/purchase', authenticateToken, async (req, res) => {
-  const { rawMaterialId, quantity, purchasePrice, supplierId, purchaseDate } = req.body;
-  const db = getDB();
-
-  const rmIndex = db.rawMaterials.findIndex(rm => rm.id === rawMaterialId);
-  if (rmIndex === -1) return res.status(404).json({ message: 'Raw Material not found' });
-  const rm = db.rawMaterials[rmIndex];
-
-  const qty = parseFloat(quantity);
-  const price = parseFloat(purchasePrice);
-  const cost = qty * price;
-
-  // Update material stock
-  rm.currentStock += qty;
-  rm.purchasePrice = price;
-  rm.purchaseDate = purchaseDate;
-  rm.supplierId = supplierId;
-
-  // Add Expense
-  const expenseId = `e_${Date.now()}`;
-  db.expenses.push({
-    id: expenseId,
-    category: 'Raw Materials',
-    amount: cost,
-    date: purchaseDate,
-    description: `Purchased ${qty} ${rm.unit} of ${rm.name} @ ₹${price}/${rm.unit}`
-  });
-
-  // Log supplier purchase history
-  const supplier = db.suppliers.find(s => s.id === supplierId);
-  if (supplier) {
-    supplier.purchaseHistory.unshift({
-      date: purchaseDate,
-      item: `${rm.name} (${qty} ${rm.unit})`,
-      amount: cost
-    });
-    // Add to outstanding payments if unpaid (we assume unpaid for demo if not paid in full)
-    supplier.outstandingPayments += cost;
-  }
-
-  db.recentActivities.unshift({
-    id: `a_${Date.now()}`,
-    action: 'Purchased Raw Material',
-    details: `Purchased ${qty} ${rm.unit} of ${rm.name}. Auto-recorded ₹${cost} expense.`,
-    timestamp: new Date().toISOString()
-  });
-
-  // Re-check stock levels
-  if (rm.currentStock >= rm.minStockLevel) {
-    // Dismiss old notifications for this low stock
-    db.notifications = db.notifications.filter(n => !(n.type === 'Low Stock' && n.message.includes(rm.name)));
-  }
-
-  await commit();
-  res.json({ message: 'Purchase logged successfully', rawMaterial: rm });
 });
 
 app.delete('/api/admin/raw-materials/:id', authenticateToken, async (req, res) => {
@@ -484,107 +651,66 @@ app.get('/api/admin/batches', authenticateToken, (req, res) => {
 
 // Create Batch: auto-deduct raw materials & add finished product stock
 app.post('/api/admin/batches', authenticateToken, async (req, res) => {
-  const { productId, recipeId, manufacturingDate, bestBeforeDate, quantityProduced, packSize, packetsProduced, manufacturingCost, notes } = req.body;
+  const { productId, batchNumber, batchCode, manufacturingDate, bestBeforeDate, packSize, packetsProduced, manufacturingCost, notes } = req.body;
   const db = getDB();
 
   const product = db.products.find(p => p.id === productId);
-  const recipe = db.recipes.find(r => r.id === recipeId);
-
-  if (!product || !recipe) {
-    return res.status(400).json({ message: 'Product or Recipe not found' });
+  if (!product) {
+    return res.status(400).json({ message: 'Product not found' });
   }
 
-  // Derive Prefix for Batch Number
-  // E.g. "Biryani Marination Mix" -> BM
-  let prefix = 'BM';
-  if (product.name.toLowerCase().includes('rasam')) prefix = 'RP';
-  else if (product.name.toLowerCase().includes('sukka')) prefix = 'CS';
-  else {
-    // Fallback: take initials
-    prefix = product.name
-      .split(' ')
-      .map(w => w[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  }
-
-  // Auto-generate next sequential batch number
-  const productBatches = db.batches.filter(b => b.productId === productId && b.batchNumber.startsWith(prefix));
-  let maxNum = 0;
-  productBatches.forEach(b => {
-    const numStr = b.batchNumber.substring(prefix.length);
-    const num = parseInt(numStr, 10);
-    if (!isNaN(num) && num > maxNum) {
-      maxNum = num;
-    }
-  });
-  const nextNum = maxNum + 1;
-  const nextBatchNumber = `${prefix}${String(nextNum).padStart(2, '0')}`;
-
-  const packetsCount = parseInt(packetsProduced, 10);
+  const packetsCount = parseInt(packetsProduced, 10) || 0;
   const mfgCost = parseFloat(manufacturingCost || 0);
-  const costPerPack = packetsCount > 0 ? parseFloat((mfgCost / packetsCount).toFixed(2)) : 0;
 
-  // 1. Deduct Raw Materials from recipe
-  // For 1 pack, recipe lists quantities. So we multiply recipe quantity * packetsCount.
-  const missingMaterials = [];
-  recipe.ingredients.forEach(ing => {
-    const rm = db.rawMaterials.find(m => m.id === ing.rawMaterialId);
-    if (!rm) {
-      missingMaterials.push(`Raw material ID ${ing.rawMaterialId} not configured.`);
-      return;
-    }
-    const needed = ing.quantity * packetsCount;
-    if (rm.currentStock < needed) {
-      missingMaterials.push(`Insufficient stock for ${rm.name}. Needed: ${needed}${rm.unit}, Current: ${rm.currentStock}${rm.unit}`);
-    }
-  });
+  // Check ingredient stock if recipe exists
+  const recipe = db.recipes.find(r => r.productId === productId);
+  if (recipe) {
+    const missingMaterials = [];
+    recipe.ingredients.forEach(ing => {
+      const rm = db.rawMaterials.find(m => m.id === ing.rawMaterialId);
+      if (!rm) return;
+      
+      const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
+      const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
+      let totalUsed = 0;
+      db.batches.forEach(b => {
+        const r = db.recipes.find(rec => rec.id === b.recipeId);
+        if (r) {
+          const rIng = r.ingredients.find(ri => ri.rawMaterialId === rm.id);
+          if (rIng) {
+            totalUsed += (rIng.quantity / r.yieldQuantity) * b.packetsProduced;
+          }
+        }
+      });
+      const currentStock = totalPurchased - totalUsed;
+      const needed = (ing.quantity / recipe.yieldQuantity) * packetsCount;
 
-  if (missingMaterials.length > 0) {
-    return res.status(400).json({ 
-      message: 'Cannot record production batch. Raw material shortages:',
-      errors: missingMaterials
+      if (currentStock < needed) {
+        missingMaterials.push(`Insufficient stock for ${rm.name}. Needed: ${needed.toFixed(3)} ${rm.unit}, Current: ${currentStock.toFixed(3)} ${rm.unit}`);
+      }
     });
+
+    if (missingMaterials.length > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot record production batch. Raw material shortages:',
+        errors: missingMaterials
+      });
+    }
   }
 
-  // Deduct stock and trigger alerts
-  recipe.ingredients.forEach(ing => {
-    const rm = db.rawMaterials.find(m => m.id === ing.rawMaterialId);
-    const needed = ing.quantity * packetsCount;
-    rm.currentStock = parseFloat((rm.currentStock - needed).toFixed(3));
-
-    // Low stock notification trigger
-    if (rm.currentStock < rm.minStockLevel) {
-      const exists = db.notifications.some(n => n.type === 'Low Stock' && n.message.includes(rm.name));
-      if (!exists) {
-        db.notifications.unshift({
-          id: `n_${Date.now()}_${rm.id}`,
-          type: 'Low Stock',
-          message: `Alert: Raw material ${rm.name} has fallen below minimum level (${rm.currentStock}/${rm.minStockLevel} ${rm.unit}).`,
-          date: manufacturingDate,
-          read: false
-        });
-      }
-    }
-  });
-
-  // 2. Increment Finished Product stock
-  product.currentStock += packetsCount;
-
-  // 3. Create the batch
+  // Create the batch
   const newBatch = {
     id: `b_${Date.now()}`,
-    batchNumber: nextBatchNumber,
+    batchNumber: batchNumber || batchCode || `B-${Date.now()}`,
+    batchCode: batchCode || batchNumber || `B-${Date.now()}`,
     productId,
-    recipeId,
+    recipeId: recipe ? recipe.id : '',
     manufacturingDate,
-    bestBeforeDate,
-    quantityProduced: parseFloat(quantityProduced),
-    packSize,
+    bestBeforeDate: bestBeforeDate || '',
+    packSize: packSize || product.packSize,
     packetsProduced: packetsCount,
     manufacturingCost: mfgCost,
-    costPerPacket: costPerPack,
+    costPerPacket: packetsCount > 0 ? parseFloat((mfgCost / packetsCount).toFixed(2)) : 0,
     notes,
     remainingStock: packetsCount,
     shopsSupplied: [],
@@ -593,18 +719,21 @@ app.post('/api/admin/batches', authenticateToken, async (req, res) => {
 
   db.batches.push(newBatch);
 
-  // 4. Log Activity
+  // Auto-log expense
+  db.expenses.push({
+    id: `e_prod_${newBatch.id}`,
+    category: 'Production',
+    amount: mfgCost,
+    date: manufacturingDate,
+    description: `Production cost for batch ${newBatch.batchNumber} (${packetsCount} pouches of ${product.name})`
+  });
+
   db.recentActivities.unshift({
     id: `a_${Date.now()}`,
     action: 'Recorded Production Batch',
-    details: `Created batch ${nextBatchNumber} (${packetsCount} packs of ${product.name}). Deducted ingredients.`,
+    details: `Created batch ${newBatch.batchNumber} (${packetsCount} packs of ${product.name}). Deducted ingredients.`,
     timestamp: new Date().toISOString()
   });
-
-  // Trigger Low product stock dismissals
-  if (product.currentStock >= 20) {
-    db.notifications = db.notifications.filter(n => !(n.type === 'Low Stock' && n.message.includes(product.name)));
-  }
 
   await commit();
   res.status(201).json(newBatch);
@@ -688,24 +817,78 @@ app.delete('/api/admin/batches/:id', authenticateToken, async (req, res) => {
   if (index === -1) return res.status(404).json({ message: 'Batch not found' });
 
   const deleted = db.batches.splice(index, 1)[0];
+  db.expenses = db.expenses.filter(e => e.id !== `e_prod_${deleted.id}`);
+
   await commit();
   res.json({ message: 'Batch record removed', batch: deleted });
 });
 
 
-// ---------------- CUSTOMERS / SHOPS CRUD ----------------
+// ---------------- CUSTOMERS / SHOPS CRUD (REVISED) ----------------
 app.get('/api/admin/customers', authenticateToken, (req, res) => {
-  res.json(getDB().customers);
+  res.json(getDB().customers || []);
 });
 
 app.post('/api/admin/customers', authenticateToken, async (req, res) => {
   const db = getDB();
+  const { 
+    date,
+    contactName, 
+    shopName, 
+    customerClassification, 
+    phoneNumber, 
+    address, 
+    productId, 
+    quantityGiven, 
+    amountReceived, 
+    paymentDate, 
+    remarks 
+  } = req.body;
+
+  const product = db.products.find(p => p.id === productId);
+  if (!product) return res.status(400).json({ message: 'Selected product not found in master catalog.' });
+
+  const qty = parseInt(quantityGiven, 10) || 0;
+  const received = parseFloat(amountReceived || 0);
+  
+  // Calculate Wholesale Price
+  const mrpValue = parseFloat(product.mrp || 0);
+  const margin = parseFloat(product.retailerMargin || 0);
+  const wholesale = parseFloat((mrpValue * (1 - margin / 100)).toFixed(2));
+  const totalReceivable = parseFloat((qty * wholesale).toFixed(2));
+  const balance = parseFloat((totalReceivable - received).toFixed(2));
+
   const newCustomer = {
     id: `c_${Date.now()}`,
-    outstandingBalance: 0,
-    ...req.body
+    date: date || new Date().toISOString().split('T')[0],
+    contactName,
+    shopName,
+    customerClassification,
+    phoneNumber: phoneNumber || '',
+    address: address || '',
+    productId,
+    productName: product.name,
+    packSize: product.packSize,
+    quantityGiven: qty,
+    wholesalePrice: wholesale,
+    totalAmountReceivable: totalReceivable,
+    amountReceived: received,
+    balanceAmount: balance,
+    paymentStatus: balance <= 0 ? 'Paid' : 'Pending',
+    paymentDate: paymentDate || '',
+    remarks: remarks || ''
   };
+
   db.customers.push(newCustomer);
+
+  // Also log activity
+  db.recentActivities.unshift({
+    id: `a_${Date.now()}`,
+    action: 'Recorded Shop Supply',
+    details: `Supplied ${qty} packs of ${product.name} to ${shopName}. Receivable: ₹${totalReceivable.toFixed(2)}.`,
+    timestamp: new Date().toISOString()
+  });
+
   await commit();
   res.status(201).json(newCustomer);
 });
@@ -713,13 +896,24 @@ app.post('/api/admin/customers', authenticateToken, async (req, res) => {
 app.put('/api/admin/customers/:id', authenticateToken, async (req, res) => {
   const db = getDB();
   const index = db.customers.findIndex(c => c.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Customer not found' });
+  if (index === -1) return res.status(404).json({ message: 'Customer record not found' });
+
+  const current = db.customers[index];
+  const { amountReceived, paymentStatus, paymentDate, remarks } = req.body;
+
+  const received = parseFloat(amountReceived ?? current.amountReceived);
+  const totalReceivable = current.totalAmountReceivable;
+  const balance = parseFloat((totalReceivable - received).toFixed(2));
 
   db.customers[index] = { 
-    ...db.customers[index], 
-    ...req.body,
-    outstandingBalance: parseFloat(req.body.outstandingBalance ?? db.customers[index].outstandingBalance)
+    ...current,
+    amountReceived: received,
+    balanceAmount: balance,
+    paymentStatus: paymentStatus || (balance <= 0 ? 'Paid' : 'Pending'),
+    paymentDate: paymentDate ?? current.paymentDate,
+    remarks: remarks ?? current.remarks
   };
+
   await commit();
   res.json(db.customers[index]);
 });
@@ -727,11 +921,11 @@ app.put('/api/admin/customers/:id', authenticateToken, async (req, res) => {
 app.delete('/api/admin/customers/:id', authenticateToken, async (req, res) => {
   const db = getDB();
   const index = db.customers.findIndex(c => c.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Customer not found' });
+  if (index === -1) return res.status(404).json({ message: 'Customer record not found' });
 
   const deleted = db.customers.splice(index, 1)[0];
   await commit();
-  res.json({ message: 'Customer profile deleted', customer: deleted });
+  res.json({ message: 'Customer supply record deleted', customer: deleted });
 });
 
 
@@ -791,152 +985,87 @@ app.delete('/api/admin/deliveries/:id', authenticateToken, async (req, res) => {
 
 // ---------------- SALES & INVOICING CRUD ----------------
 app.get('/api/admin/sales', authenticateToken, (req, res) => {
-  res.json(getDB().sales);
+  res.json(getDB().sales || []);
 });
 
 app.post('/api/admin/sales', authenticateToken, async (req, res) => {
-  const { date, customerId, discount, paymentMethod, items, notes } = req.body;
+  const { date, customerId, productId, batchId, quantityGiven, amountReceived, paymentStatus, paymentDate, remarks } = req.body;
   const db = getDB();
 
-  // Find Customer
-  const customer = db.customers.find(c => c.id === customerId);
-  if (!customer) return res.status(400).json({ message: 'Customer profile required.' });
-
-  // Generate Invoice Number
-  const maxInvoiceNum = db.sales.reduce((max, s) => {
-    const num = parseInt(s.invoiceNumber.replace('INV-', ''), 10);
-    return !isNaN(num) && num > max ? num : max;
-  }, 1000);
-  const nextInvoiceNumber = `INV-${maxInvoiceNum + 1}`;
-
-  // Validate and update stock
-  const errorStock = [];
-  let subtotal = 0;
-
-  items.forEach(item => {
-    const product = db.products.find(p => p.id === item.productId);
-    const batch = db.batches.find(b => b.id === item.batchId);
-
-    if (!product) {
-      errorStock.push(`Product ID ${item.productId} not found.`);
-      return;
-    }
-    if (!batch) {
-      errorStock.push(`Production batch not selected for ${product.name}.`);
-      return;
-    }
-
-    const qty = parseInt(item.quantity, 10);
-    if (batch.remainingStock < qty) {
-      errorStock.push(`Insufficient stock in batch ${batch.batchNumber} for ${product.name}. Available: ${batch.remainingStock}, Requested: ${qty}`);
-    } else {
-      subtotal += qty * parseFloat(item.sellingPrice);
-    }
-  });
-
-  if (errorStock.length > 0) {
-    return res.status(400).json({ message: 'Stock error:', errors: errorStock });
+  if (!customerId || !productId || !batchId || !quantityGiven) {
+    return res.status(400).json({ message: 'Missing required sales fields' });
   }
 
-  const discountAmount = parseFloat(discount || 0);
-  const totalAmount = Math.max(0, subtotal - discountAmount);
+  const customer = db.customers.find(c => c.id === customerId);
+  const shopName = customer ? customer.shopName : 'Direct Shop';
 
-  // Commit Stock deductions and batch links
-  const processedItems = items.map(item => {
-    const product = db.products.find(p => p.id === item.productId);
-    const batch = db.batches.find(b => b.id === item.batchId);
-    const qty = parseInt(item.quantity, 10);
-    const itemPrice = parseFloat(item.sellingPrice);
+  const product = db.products.find(p => p.id === productId);
+  if (!product) return res.status(404).json({ message: 'Product not found' });
 
-    // Deduct batch inventory
-    batch.remainingStock -= qty;
-    
-    // Add shop to supplied list if not present
-    if (!batch.shopsSupplied.includes(customer.shopName)) {
-      batch.shopsSupplied.push(customer.shopName);
-    }
+  const batch = db.batches.find(b => b.id === batchId);
+  if (!batch) return res.status(404).json({ message: 'Production batch not found' });
 
-    // Deduct product inventory
-    product.currentStock -= qty;
+  const qty = parseInt(quantityGiven, 10) || 0;
+  const received = parseFloat(amountReceived || 0);
 
-    // Trigger finished product low stock notification
-    if (product.currentStock < 20) {
-      const exists = db.notifications.some(n => n.type === 'Low Stock' && n.message.includes(product.name));
-      if (!exists) {
-        db.notifications.unshift({
-          id: `n_${Date.now()}_${product.id}`,
-          type: 'Low Stock',
-          message: `Alert: Finished product ${product.name} is low on stock (${product.currentStock} packs left).`,
-          date: date,
-          read: false
-        });
-      }
-    }
+  if (batch.remainingStock < qty) {
+    return res.status(400).json({ 
+      message: `Insufficient stock in batch ${batch.batchNumber}. Available: ${batch.remainingStock}, Requested: ${qty}` 
+    });
+  }
 
-    return {
-      productId: item.productId,
-      batchId: item.batchId,
-      batchNumber: batch.batchNumber,
-      quantity: qty,
-      sellingPrice: itemPrice,
-      totalAmount: qty * itemPrice
-    };
-  });
+  const totalReceivable = qty * product.wholesalePrice;
+  const balance = totalReceivable - received;
 
-  // Create Sale invoice
   const newSale = {
     id: `s_${Date.now()}`,
-    invoiceNumber: nextInvoiceNumber,
     date,
     customerId,
-    discount: discountAmount,
-    paymentMethod,
-    totalAmount,
-    notes,
-    items: processedItems
+    shopName,
+    productId,
+    productName: product.name,
+    batchId,
+    batchNumber: batch.batchNumber,
+    packSize: product.packSize,
+    quantityGiven: qty,
+    mrp: product.mrp,
+    wholesalePrice: product.wholesalePrice,
+    totalAmountReceivable: parseFloat(totalReceivable.toFixed(2)),
+    paymentStatus: paymentStatus || (balance <= 0 ? 'Paid' : 'Pending'),
+    amountReceived: received,
+    balanceAmount: parseFloat(balance.toFixed(2)),
+    paymentDate: paymentDate || '',
+    remarks: remarks || ''
   };
 
   db.sales.push(newSale);
 
-  // Handle payments (Outstanding Balances vs Pending payments)
-  const isCredit = paymentMethod === 'Credit' || paymentMethod === 'Bank Transfer' || paymentMethod === 'Due';
-  if (isCredit) {
-    customer.outstandingBalance += totalAmount;
+  // Deduct remaining stock in batch
+  batch.remainingStock -= qty;
 
-    // Add Pending Payment record
+  // Track customer outstanding dues
+  if (customer) {
+    customer.outstandingBalance = parseFloat((customer.outstandingBalance + balance).toFixed(2));
+  }
+
+  // Create Pending Payment record if balance > 0
+  if (balance > 0) {
     db.pendingPayments.push({
       id: `pp_${Date.now()}`,
       customerId,
-      invoiceNumber: nextInvoiceNumber,
-      totalAmount,
-      amountPaid: 0,
-      pendingAmount: totalAmount,
-      dueDate: new Date(new Date(date).getTime() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 10 days due
+      invoiceNumber: newSale.id,
+      totalAmount: totalReceivable,
+      amountPaid: received,
+      pendingAmount: balance,
+      dueDate: new Date(new Date(date).getTime() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       status: 'Pending'
     });
   }
 
-  // Create Order in pipeline (Paid or Delivered depending on cash vs credit)
-  db.orders.push({
-    id: `o_${Date.now()}`,
-    invoiceNumber: nextInvoiceNumber,
-    customerId,
-    status: isCredit ? 'Delivered' : 'Paid', // credit -> delivered but unpaid, cash -> paid
-    orderDate: date,
-    notes: `Generated via sales log. Payment: ${paymentMethod}`
-  });
-
-  // Update Sales Target Progression for the current month
-  const monthKey = date.substring(0, 7); // e.g. "2026-07"
-  const target = db.salesTargets.find(t => t.period === monthKey);
-  if (target) {
-    target.currentRevenue += totalAmount;
-  }
-
   db.recentActivities.unshift({
     id: `a_${Date.now()}`,
-    action: 'Logged Sale / Invoice',
-    details: `Logged Invoice ${nextInvoiceNumber} to ${customer.shopName} for ₹${totalAmount}.`,
+    action: 'Recorded Sale Ledger',
+    details: `Supplied ${qty} packs of ${product.name} to ${shopName}. Receivable: ₹${totalReceivable.toFixed(2)}.`,
     timestamp: new Date().toISOString()
   });
 
@@ -947,14 +1076,26 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
 app.delete('/api/admin/sales/:id', authenticateToken, async (req, res) => {
   const db = getDB();
   const index = db.sales.findIndex(s => s.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Sale invoice not found' });
+  if (index === -1) return res.status(404).json({ message: 'Sale record not found' });
 
   const deleted = db.sales.splice(index, 1)[0];
-  // Note: we do not automatically reverse stock to prevent batch historical conflicts in this simple demo, but we log the delete action.
+
+  const batch = db.batches.find(b => b.id === deleted.batchId);
+  if (batch) {
+    batch.remainingStock += deleted.quantityGiven;
+  }
+
+  const customer = db.customers.find(c => c.id === deleted.customerId);
+  if (customer) {
+    customer.outstandingBalance = Math.max(0, parseFloat((customer.outstandingBalance - deleted.balanceAmount).toFixed(2)));
+  }
+
+  db.pendingPayments = db.pendingPayments.filter(pp => pp.invoiceNumber !== deleted.id);
+
   db.recentActivities.unshift({
     id: `a_${Date.now()}`,
     action: 'Deleted Invoice',
-    details: `Deleted Invoice ${deleted.invoiceNumber} (₹${deleted.totalAmount}).`,
+    details: `Deleted Invoice ${deleted.id} (₹${deleted.totalAmountReceivable}).`,
     timestamp: new Date().toISOString()
   });
 
@@ -1207,20 +1348,21 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
       reportData = filteredSales.map(s => {
         const cust = db.customers.find(c => c.id === s.customerId);
         return {
-          'Invoice #': s.invoiceNumber,
           'Date': s.date,
           'Shop / Customer': cust ? cust.shopName : 'Direct Customer',
-          'Items Count': s.items.length,
-          'Payment Method': s.paymentMethod,
-          'Discount': `₹${s.discount}`,
-          'Total Amount': `₹${s.totalAmount}`
+          'Product Name': s.productName,
+          'Batch #': s.batchNumber,
+          'Quantity Given': s.quantityGiven,
+          'Wholesale Price': `₹${s.wholesalePrice}`,
+          'Total Amount': `₹${s.totalAmountReceivable}`,
+          'Status': s.paymentStatus
         };
       });
-      const totalRev = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
+      const totalRev = filteredSales.reduce((acc, s) => acc + s.totalAmountReceivable, 0);
       summary = {
-        'Total Invoices': filteredSales.length,
+        'Total Transactions': filteredSales.length,
         'Gross Revenue': `₹${totalRev}`,
-        'Average Invoice Value': filteredSales.length > 0 ? `₹${(totalRev / filteredSales.length).toFixed(2)}` : '₹0.00'
+        'Average Transaction Value': filteredSales.length > 0 ? `₹${(totalRev / filteredSales.length).toFixed(2)}` : '₹0.00'
       };
       break;
     }
@@ -1228,20 +1370,17 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
       const filteredSales = filterByDate(db.sales, 'date');
       const productTotals = {};
       filteredSales.forEach(s => {
-        s.items.forEach(item => {
-          const p = db.products.find(prod => prod.id === item.productId);
-          const name = p ? p.name : 'Unknown Product';
-          if (!productTotals[name]) productTotals[name] = 0;
-          productTotals[name] += item.totalAmount;
-        });
+        const name = s.productName || 'Unknown Product';
+        if (!productTotals[name]) productTotals[name] = 0;
+        productTotals[name] += s.totalAmountReceivable;
       });
       reportData = Object.entries(productTotals).map(([product, total]) => ({
         'Product Name': product,
         'Revenue Generated': `₹${total}`
       }));
       summary = {
-        'Total Revenue': `₹${filteredSales.reduce((acc, s) => acc + s.totalAmount, 0)}`,
-        'Active Sales Invoices': filteredSales.length
+        'Total Revenue': `₹${filteredSales.reduce((acc, s) => acc + s.totalAmountReceivable, 0)}`,
+        'Active Sales Records': filteredSales.length
       };
       break;
     }
@@ -1252,18 +1391,16 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
       const productProfit = {};
 
       filteredSales.forEach(s => {
-        s.items.forEach(item => {
-          const prod = db.products.find(p => p.id === item.productId);
-          const cost = prod ? prod.costPrice : 0;
-          const profit = (item.sellingPrice - cost) * item.quantity;
-          grossProfit += profit;
+        const prod = db.products.find(p => p.id === s.productId);
+        const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+        const profit = s.totalAmountReceivable - (cost * s.quantityGiven);
+        grossProfit += profit;
 
-          const pName = prod ? prod.name : 'Unknown';
-          if (!productProfit[pName]) productProfit[pName] = { sales: 0, cost: 0, profit: 0 };
-          productProfit[pName].sales += item.totalAmount;
-          productProfit[pName].cost += cost * item.quantity;
-          productProfit[pName].profit += profit;
-        });
+        const pName = s.productName || 'Unknown';
+        if (!productProfit[pName]) productProfit[pName] = { sales: 0, cost: 0, profit: 0 };
+        productProfit[pName].sales += s.totalAmountReceivable;
+        productProfit[pName].cost += cost * s.quantityGiven;
+        productProfit[pName].profit += profit;
       });
 
       reportData = Object.entries(productProfit).map(([product, metrics]) => ({
@@ -1290,9 +1427,8 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
           'Product Name': prod ? prod.name : 'Unknown',
           'MFG Date': b.manufacturingDate,
           'Best Before': b.bestBeforeDate,
-          'Quantity Produced': `${b.quantityProduced} kg`,
+          'Quantity Produced': `${b.packetsProduced} pouches`,
           'Pack Size': b.packSize,
-          'Packets Produced': b.packetsProduced,
           'Production Cost': `₹${b.manufacturingCost}`,
           'Cost Per Packet': `₹${b.costPerPacket}`
         };
@@ -1306,20 +1442,45 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
     }
     case 'inventory': {
       reportData = db.rawMaterials.map(rm => {
-        const supp = db.suppliers.find(s => s.id === rm.supplierId);
+        const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
+        const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
+        let totalUsed = 0;
+        db.batches.forEach(b => {
+          const recipe = db.recipes.find(r => r.id === b.recipeId);
+          if (recipe) {
+            const ing = recipe.ingredients.find(i => i.rawMaterialId === rm.id);
+            if (ing) {
+              totalUsed += (ing.quantity / recipe.yieldQuantity) * b.packetsProduced;
+            }
+          }
+        });
+        const currentStock = totalPurchased - totalUsed;
         return {
           'Material Name': rm.name,
-          'Current Stock': `${rm.currentStock} ${rm.unit}`,
+          'Total Purchased': `${totalPurchased} ${rm.unit}`,
+          'Total Used': `${totalUsed} ${rm.unit}`,
+          'Current Stock': `${currentStock} ${rm.unit}`,
           'Min. Stock Level': `${rm.minStockLevel} ${rm.unit}`,
-          'Last Purchase Price': `₹${rm.purchasePrice}/${rm.unit}`,
-          'Supplier': supp ? supp.name : 'Unknown',
-          'Stock Status': rm.currentStock < rm.minStockLevel ? 'LOW STOCK ALERT' : 'Normal'
+          'Stock Status': currentStock < rm.minStockLevel ? 'LOW STOCK ALERT' : 'Normal'
         };
       });
       summary = {
         'Raw Materials Tracked': db.rawMaterials.length,
-        'Low Stock Items': db.rawMaterials.filter(rm => rm.currentStock < rm.minStockLevel).length,
-        'Estimated Materials Value': `₹${db.rawMaterials.reduce((acc, rm) => acc + rm.currentStock * rm.purchasePrice, 0).toFixed(2)}`
+        'Low Stock Items': db.rawMaterials.filter(rm => {
+          const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
+          const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
+          let totalUsed = 0;
+          db.batches.forEach(b => {
+            const recipe = db.recipes.find(r => r.id === b.recipeId);
+            if (recipe) {
+              const ing = recipe.ingredients.find(i => i.rawMaterialId === rm.id);
+              if (ing) {
+                totalUsed += (ing.quantity / recipe.yieldQuantity) * b.packetsProduced;
+              }
+            }
+          });
+          return (totalPurchased - totalUsed) < rm.minStockLevel;
+        }).length
       };
       break;
     }

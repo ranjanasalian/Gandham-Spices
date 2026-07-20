@@ -7,6 +7,7 @@ import { Loader } from 'lucide-react';
 // Subpages
 import DashboardHome from './pages/DashboardHome';
 import DailySummary from './pages/DailySummary';
+import PurchaseHistory from './pages/PurchaseHistory';
 import ProductionMgmt from './pages/ProductionMgmt';
 import RecipeTracker from './pages/RecipeTracker';
 import BatchTraceability from './pages/BatchTraceability';
@@ -83,6 +84,8 @@ export default function AdminApp() {
         return <DashboardHome isDarkMode={isDarkMode} />;
       case 'daily-summary':
         return <DailySummary />;
+      case 'purchase-history':
+        return <PurchaseHistory />;
       case 'production':
         return <ProductionMgmt />;
       case 'recipes':

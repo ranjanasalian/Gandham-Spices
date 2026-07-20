@@ -119,6 +119,17 @@ body {
   scrollbar-width: none;  /* Firefox */
 }
 
+/* Global Table Header Font Scaling */
+thead th {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+}
+
+/* Global Table Headers and Cells Centering */
+table th, table td {
+  text-align: center !important;
+}
+
 /* Print Styles for PDF Generation */
 @media print {
   html, body {

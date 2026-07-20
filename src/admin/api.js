@@ -107,6 +107,16 @@ export const api = {
       method: 'DELETE'
     })
   },
+  ingredientPurchases: {
+    getAll: () => request('/admin/ingredient-purchases'),
+    create: (purchase) => request('/admin/ingredient-purchases', {
+      method: 'POST',
+      body: JSON.stringify(purchase)
+    }),
+    delete: (id) => request(`/admin/ingredient-purchases/${id}`, {
+      method: 'DELETE'
+    })
+  },
   recipes: {
     getAll: () => request('/admin/recipes'),
     create: (recipe) => request('/api/admin/recipes', {

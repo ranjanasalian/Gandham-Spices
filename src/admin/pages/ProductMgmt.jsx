@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Package, Edit2, Plus, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Package, Edit2, Plus, AlertCircle, CheckCircle2, RefreshCw, ShoppingBag, Archive } from 'lucide-react';
 
 export default function ProductMgmt() {
   const [products, setProducts] = useState([]);
@@ -15,9 +15,8 @@ export default function ProductMgmt() {
   const [sku, setSku] = useState('');
   const [category, setCategory] = useState('Spice Blends');
   const [mrp, setMrp] = useState('');
-  const [wholesalePrice, setWholesalePrice] = useState('');
-  const [costPrice, setCostPrice] = useState('');
-  const [currentStock, setCurrentStock] = useState('0');
+  const [retailerMargin, setRetailerMargin] = useState('0');
+  const [productionCost, setProductionCost] = useState('0');
   const [packSize, setPackSize] = useState('100g');
   const [status, setStatus] = useState('Active');
 
@@ -42,10 +41,9 @@ export default function ProductMgmt() {
     setName(prod.name);
     setSku(prod.sku);
     setCategory(prod.category);
-    setMrp(prod.mrp);
-    setWholesalePrice(prod.wholesalePrice);
-    setCostPrice(prod.costPrice);
-    setCurrentStock(prod.currentStock);
+    setMrp(prod.mrp.toString());
+    setRetailerMargin((prod.retailerMargin || 0).toString());
+    setProductionCost((prod.productionCost || prod.costPrice || 0).toString());
     setPackSize(prod.packSize);
     setStatus(prod.status);
     setEditorOpen(true);
@@ -57,9 +55,8 @@ export default function ProductMgmt() {
     setSku('');
     setCategory('Spice Blends');
     setMrp('');
-    setWholesalePrice('');
-    setCostPrice('');
-    setCurrentStock('0');
+    setRetailerMargin('0');
+    setProductionCost('0');
     setPackSize('100g');
     setStatus('Active');
     setEditorOpen(true);
@@ -70,7 +67,7 @@ export default function ProductMgmt() {
     setError('');
     setSuccess('');
 
-    if (!name || !sku || !mrp || !wholesalePrice || !costPrice) {
+    if (!name || !sku || !mrp || !retailerMargin || !productionCost) {
       setError('Please fill in all pricing and description fields');
       return;
     }
@@ -81,19 +78,18 @@ export default function ProductMgmt() {
         sku,
         category,
         mrp: parseFloat(mrp),
-        wholesalePrice: parseFloat(wholesalePrice),
-        costPrice: parseFloat(costPrice),
-        currentStock: parseInt(currentStock, 10),
+        retailerMargin: parseFloat(retailerMargin),
+        productionCost: parseFloat(productionCost),
         packSize,
         status
       };
 
       if (editId) {
         await api.products.update(editId, payload);
-        setSuccess('Product details updated successfully.');
+        setSuccess('Product specifications saved.');
       } else {
         await api.products.create(payload);
-        setSuccess(`Product "${name}" added to registry.`);
+        setSuccess(`Product "${name}" registered in master catalog.`);
       }
 
       setEditorOpen(false);
@@ -102,6 +98,28 @@ export default function ProductMgmt() {
       setError('Failed to save product configurations');
     }
   };
+
+  // Real-time calculations
+  const mrpValue = parseFloat(mrp) || 0;
+  const marginPct = parseFloat(retailerMargin) || 0;
+  const prodCostValue = parseFloat(productionCost) || 0;
+
+  const calculatedWholesale = parseFloat((mrpValue * (1 - marginPct / 100)).toFixed(2));
+  const calculatedNetProfit = parseFloat((calculatedWholesale - prodCostValue).toFixed(2));
+  const calculatedNetMargin = calculatedWholesale > 0 ? parseFloat(((calculatedNetProfit / calculatedWholesale) * 100).toFixed(1)) : 0;
+
+  // Finished Goods Inventory Dashboard metrics
+  const totalProduced = products.reduce((acc, p) => acc + (p.totalProduced || 0), 0);
+  const totalSold = products.reduce((acc, p) => acc + (p.totalSold || 0), 0);
+  const remainingStock = products.reduce((acc, p) => acc + (p.currentStock || 0), 0);
+
+  // Group stock by pouch size
+  const stockByPouchSize = {};
+  products.forEach(p => {
+    const size = p.packSize || 'Unknown';
+    if (!stockByPouchSize[size]) stockByPouchSize[size] = 0;
+    stockByPouchSize[size] += (p.currentStock || 0);
+  });
 
   if (loading) {
     return (
@@ -118,14 +136,14 @@ export default function ProductMgmt() {
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-bold flex items-center gap-2">
           <Package className="w-6 h-6 text-saffron" />
-          <span>Finished Products Catalog</span>
+          <span>Finished Goods Product Master</span>
         </h3>
         <button
           onClick={handleAddNewClick}
           className="flex items-center gap-1.5 px-4 py-2 bg-saffron hover:bg-orange-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Catalog Product</span>
+          <span>Register Catalog Product</span>
         </button>
       </div>
 
@@ -142,11 +160,55 @@ export default function ProductMgmt() {
         </div>
       )}
 
+      {/* ---------------- FINISHED GOODS INVENTORY METRICS ---------------- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-3xl flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Pouches Produced</p>
+            <h4 className="text-xl font-black mt-1 text-slate-900 dark:text-white">{totalProduced} <span className="text-xs text-slate-400 font-medium">packs</span></h4>
+          </div>
+          <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
+            <Package className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-3xl flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Pouches Sold</p>
+            <h4 className="text-xl font-black mt-1 text-emerald-500">{totalSold} <span className="text-xs text-slate-400 font-medium">packs</span></h4>
+          </div>
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-xl">
+            <ShoppingBag className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-3xl flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Remaining stock in hand</p>
+            <h4 className="text-xl font-black mt-1 text-orange-500">{remainingStock} <span className="text-xs text-slate-400 font-medium">packs</span></h4>
+          </div>
+          <div className="p-2.5 bg-orange-500/10 text-orange-500 rounded-xl">
+            <Archive className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Stock by Pouch Size */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm text-xs flex flex-wrap items-center gap-3">
+        <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Stock By Pouch Size:</span>
+        {Object.entries(stockByPouchSize).map(([size, stock]) => (
+          <span key={size} className="bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 px-3 py-1 rounded-full font-black text-slate-700 dark:text-slate-350">
+            {size}: {stock} packs
+          </span>
+        ))}
+        {Object.keys(stockByPouchSize).length === 0 && <span className="text-slate-400">No stock logged</span>}
+      </div>
+
       {/* ---------------- FORM MODAL (ADD / EDIT) ---------------- */}
       {editorOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
-          <div className="flex min-h-full items-start justify-center p-4 text-center">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-0" onClick={() => setEditorOpen(false)} />
+          <div className="relative z-10 flex min-h-full w-full items-start justify-center p-4 text-center">
             <div className="relative my-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-lg text-left shadow-2xl animate-fade-in-up text-xs z-10">
             <h3 className="text-lg font-bold mb-4 border-b pb-2 flex items-center gap-2">
               <Package className="w-5 h-5 text-saffron" />
@@ -188,7 +250,7 @@ export default function ProductMgmt() {
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
                   >
-                    <option value="Spice Blends">Spice Blends</option>
+                    <option value="Spice Spice Blends">Spice Blends</option>
                     <option value="Spice Powders">Spice Powders</option>
                     <option value="Masalas">Masalas</option>
                     <option value="Whole Spices">Whole Spices</option>
@@ -225,60 +287,60 @@ export default function ProductMgmt() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="prod-wholesale-price-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Wholesale Price (₹) *</label>
+                  <label htmlFor="prod-margin-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Retail Margin (%) *</label>
                   <input
-                    id="prod-wholesale-price-input"
+                    id="prod-margin-input"
                     type="number"
-                    step="0.01"
-                    placeholder="Wholesale"
-                    value={wholesalePrice}
-                    onChange={(e) => setWholesalePrice(e.target.value)}
+                    step="0.1"
+                    placeholder="e.g. 25"
+                    value={retailerMargin}
+                    onChange={(e) => setRetailerMargin(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron"
                   />
                 </div>
                 <div>
-                  <label htmlFor="prod-cost-price-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Cost Price (₹) *</label>
+                  <label htmlFor="prod-cost-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Production Cost (₹) *</label>
                   <input
-                    id="prod-cost-price-input"
+                    id="prod-cost-input"
                     type="number"
                     step="0.01"
-                    placeholder="Cost"
-                    value={costPrice}
-                    onChange={(e) => setCostPrice(e.target.value)}
+                    placeholder="Production Cost"
+                    value={productionCost}
+                    onChange={(e) => setProductionCost(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="prod-stock-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Current Stock (packets) *</label>
-                  <input
-                    id="prod-stock-input"
-                    type="number"
-                    placeholder="Stock count"
-                    value={currentStock}
-                    onChange={(e) => setCurrentStock(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron"
-                  />
+              {/* Dynamic calculations values */}
+              <div className="bg-slate-50 dark:bg-slate-800 border dark:border-slate-800 p-3 rounded-2xl space-y-2 font-semibold">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Calculated Wholesale Price:</span>
+                  <span className="font-bold text-indigo-500">₹{calculatedWholesale.toFixed(2)}</span>
                 </div>
-                <div>
-                  <label htmlFor="prod-status-select" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Registry Status *</label>
-                  <select
-                    id="prod-status-select"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Net Profit per Pouch:</span>
+                  <span className={`font-bold ${calculatedNetProfit >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    ₹{calculatedNetProfit.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Net Margin (%):</span>
+                  <span className="font-black text-slate-700 dark:text-slate-350">{calculatedNetMargin}%</span>
                 </div>
               </div>
 
-              <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl flex justify-between items-center font-bold">
-                <span className="text-slate-500">Profit margin:</span>
-                <span className="text-emerald-500 text-sm">₹{((parseFloat(mrp) || 0) - (parseFloat(costPrice) || 0)).toFixed(2)} per packet</span>
+              <div>
+                <label htmlFor="prod-status-select" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Registry Status *</label>
+                <select
+                  id="prod-status-select"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-800">
@@ -313,48 +375,58 @@ export default function ProductMgmt() {
                 <th className="py-3 px-2">Category</th>
                 <th className="py-3 px-2 text-center">Pack Size</th>
                 <th className="py-3 px-2 text-right">MRP</th>
-                <th className="py-3 px-2 text-right">Wholesale</th>
-                <th className="py-3 px-2 text-right">Cost Price</th>
+                <th className="py-3 px-2 text-right">Wholesale Price</th>
+                <th className="py-3 px-2 text-right">Production Cost</th>
+                <th className="py-3 px-2 text-right">Net Profit</th>
                 <th className="py-3 px-2 text-center">Stock</th>
                 <th className="py-3 px-2 text-center">Status</th>
                 <th className="py-3 px-2 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {products.map((p) => {
-                const isLow = p.currentStock < 20;
-                return (
-                  <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">
-                    <td className="py-3 px-2 font-bold text-slate-800 dark:text-white">{p.name}</td>
-                    <td className="py-3 px-2 font-mono font-bold text-slate-500">{p.sku}</td>
-                    <td className="py-3 px-2">{p.category}</td>
-                    <td className="py-3 px-2 text-center font-semibold">{p.packSize}</td>
-                    <td className="py-3 px-2 text-right font-black">₹{p.mrp}</td>
-                    <td className="py-3 px-2 text-right font-bold text-indigo-500">₹{p.wholesalePrice}</td>
-                    <td className="py-3 px-2 text-right text-slate-500">₹{p.costPrice}</td>
-                    <td className="py-3 px-2 text-center">
-                      <span className={`font-black ${isLow ? 'text-red-500 font-extrabold animate-pulse' : ''}`}>
-                        {p.currentStock} packs
-                      </span>
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                        p.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-200 dark:bg-slate-800 text-slate-400'
-                      }`}>
-                        {p.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      <button
-                        onClick={() => handleEditClick(p)}
-                        className="p-1.5 text-slate-400 hover:text-saffron hover:bg-saffron/10 rounded-xl transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {products.length === 0 ? (
+                <tr>
+                  <td colSpan="11" className="text-center py-10 text-slate-400">
+                    No products registered. Click Add Catalog Product to start.
+                  </td>
+                </tr>
+              ) : (
+                products.map((p) => {
+                  const isLow = p.currentStock < 20;
+                  return (
+                    <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">
+                      <td className="py-3 px-2 font-bold text-slate-800 dark:text-white">{p.name}</td>
+                      <td className="py-3 px-2 font-mono font-bold text-slate-500">{p.sku}</td>
+                      <td className="py-3 px-2">{p.category}</td>
+                      <td className="py-3 px-2 text-center font-semibold">{p.packSize}</td>
+                      <td className="py-3 px-2 text-right font-black">₹{p.mrp}</td>
+                      <td className="py-3 px-2 text-right font-bold text-indigo-500">₹{p.wholesalePrice} <span className="text-[10px] text-slate-400">({p.retailerMargin}%)</span></td>
+                      <td className="py-3 px-2 text-right text-slate-500">₹{p.productionCost || p.costPrice}</td>
+                      <td className="py-3 px-2 text-right font-black text-emerald-500">₹{p.netProfit} <span className="text-[10px] text-slate-400">({p.netMargin}%)</span></td>
+                      <td className="py-3 px-2 text-center">
+                        <span className={`font-black ${isLow ? 'text-red-500 font-extrabold animate-pulse' : ''}`}>
+                          {p.currentStock} packs
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                          p.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-200 dark:bg-slate-800 text-slate-400'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <button
+                          onClick={() => handleEditClick(p)}
+                          className="p-1.5 text-slate-400 hover:text-saffron hover:bg-saffron/10 rounded-xl transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

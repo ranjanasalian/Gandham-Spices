@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../api';
 import {
   TrendingUp, TrendingDown, DollarSign, Package, AlertTriangle, Users,
-  ShoppingBag, Calendar, ArrowRight, RefreshCw, BarChart2, ShieldAlert, ClipboardList, Store
+  ShoppingBag, Calendar, ArrowRight, RefreshCw, BarChart2, ShieldAlert, ClipboardList, Store, Archive
 } from 'lucide-react';
 
 export default function DashboardHome({ isDarkMode }) {
@@ -10,16 +10,23 @@ export default function DashboardHome({ isDarkMode }) {
   const [startDate, setStartDate] = useState('2026-07-14');
   const [endDate, setEndDate] = useState('2026-07-20');
   const [stats, setStats] = useState(null);
+  const [activeTarget, setActiveTarget] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hoveredDataPoint, setHoveredDataPoint] = useState(null);
 
-  const fetchStats = async () => {
+  const fetchStatsAndTargets = async () => {
     setLoading(true);
     setError('');
     try {
       const data = await api.stats.getDashboardStats(range, startDate, endDate);
       setStats(data);
+
+      // Fetch active target
+      const targetsData = await api.targets.getAll();
+      const currentMonthKey = new Date().toISOString().substring(0, 7); // "YYYY-MM"
+      const target = targetsData.find(t => t.period === currentMonthKey);
+      setActiveTarget(target || null);
     } catch (err) {
       setError(err.message || 'Failed to load dashboard metrics');
     } finally {
@@ -28,12 +35,12 @@ export default function DashboardHome({ isDarkMode }) {
   };
 
   useEffect(() => {
-    fetchStats();
+    fetchStatsAndTargets();
   }, [range]);
 
   const handleCustomSearch = () => {
     if (range === 'custom') {
-      fetchStats();
+      fetchStatsAndTargets();
     }
   };
 
@@ -49,22 +56,53 @@ export default function DashboardHome({ isDarkMode }) {
   const charts = stats?.charts || {};
   const recentActivities = stats?.recentActivities || [];
 
-  // Card definition helper
-  const cards = [
-    { title: 'Products Manufactured Today', value: summary.productsManufactured, unit: 'packs', icon: Package, color: 'text-blue-500 bg-blue-500/10' },
-    { title: 'Products Sold Today', value: summary.productsSold, unit: 'packs', icon: ShoppingBag, color: 'text-emerald-500 bg-emerald-500/10' },
-    { title: 'Products Delivered Today', value: summary.productsDelivered, unit: 'packs', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-500/10' },
-    { title: 'Current Inventory', value: summary.currentInventory, unit: 'packs', icon: Package, color: 'text-orange-500 bg-orange-500/10' },
-    { title: 'Total Revenue', value: `₹${summary.totalRevenue || 0}`, unit: '', icon: DollarSign, color: 'text-amber-500 bg-amber-500/10' },
-    { title: 'Total Profit', value: `₹${summary.totalProfit || 0}`, unit: '', icon: TrendingUp, color: 'text-teal-500 bg-teal-500/10' },
-    { title: 'Total Expenses', value: `₹${summary.totalExpenses || 0}`, unit: '', icon: TrendingDown, color: 'text-rose-500 bg-rose-500/10' },
-    { title: 'Pending Payments', value: `₹${summary.pendingPayments || 0}`, unit: '', icon: DollarSign, color: 'text-yellow-500 bg-yellow-500/10' },
-    { title: 'Total Customers', value: summary.totalCustomers, unit: 'profiles', icon: Users, color: 'text-sky-500 bg-sky-500/10' },
-    { title: 'Total Shops', value: summary.totalShops, unit: 'shops', icon: Store, color: 'text-violet-500 bg-violet-500/10' },
-    { title: 'Orders Received Today', value: summary.ordersReceived, unit: 'orders', icon: ShoppingBag, color: 'text-cyan-500 bg-cyan-500/10' },
-    { title: 'Orders Delivered Today', value: summary.ordersDelivered, unit: 'orders', icon: TrendingUp, color: 'text-purple-500 bg-purple-500/10' },
-    { title: 'Low Stock Alerts', value: summary.lowStockAlerts, unit: 'warnings', icon: AlertTriangle, color: summary.lowStockAlerts > 0 ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-slate-400 bg-slate-400/10' },
-  ];
+  // Determine cards based on range selection
+  let cards = [];
+  if (range === 'today') {
+    const today = summary.today || { productsProduced: 0, productsSold: 0, revenue: 0 };
+    cards = [
+      { title: 'Products Manufactured Today', value: today.productsProduced, unit: 'packs', icon: Package, color: 'text-blue-500 bg-blue-500/10' },
+      { title: 'Products Sold Today', value: today.productsSold, unit: 'packs', icon: ShoppingBag, color: 'text-emerald-500 bg-emerald-500/10' },
+      { title: 'Revenue Today', value: `₹${(today.revenue || 0).toFixed(2)}`, unit: '', icon: DollarSign, color: 'text-amber-500 bg-amber-500/10' },
+      { title: 'Current Finished Stock', value: summary.currentInventory || 0, unit: 'packs', icon: Archive, color: 'text-orange-500 bg-orange-500/10' },
+      { title: 'Low Stock Alerts', value: summary.lowStockAlerts || 0, unit: 'warnings', icon: AlertTriangle, color: summary.lowStockAlerts > 0 ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-slate-400 bg-slate-400/10' },
+    ];
+  } else if (range === 'month' || range === 'year') {
+    const month = summary.thisMonth || { revenue: 0, netProfit: 0, expenses: 0, ingredientPurchases: 0, productionQty: 0, pouchesSold: 0 };
+    cards = [
+      { title: 'Total Revenue (Month)', value: `₹${(month.revenue || 0).toFixed(2)}`, unit: '', icon: DollarSign, color: 'text-amber-500 bg-amber-500/10' },
+      { title: 'Net Profit (Month)', value: `₹${(month.netProfit || 0).toFixed(2)}`, unit: '', icon: TrendingUp, color: 'text-teal-500 bg-teal-500/10' },
+      { title: 'Total Expenses (Month)', value: `₹${(month.expenses || 0).toFixed(2)}`, unit: '', icon: TrendingDown, color: 'text-rose-500 bg-rose-500/10' },
+      { title: 'Ingredient Purchases (Month)', value: `₹${(month.ingredientPurchases || 0).toFixed(2)}`, unit: '', icon: ShoppingBag, color: 'text-indigo-500 bg-indigo-500/10' },
+      { title: 'Production Quantity (Month)', value: month.productionQty || 0, unit: 'packs', icon: Package, color: 'text-blue-500 bg-blue-500/10' },
+      { title: 'Pouches Sold (Month)', value: month.pouchesSold || 0, unit: 'packs', icon: ShoppingBag, color: 'text-emerald-500 bg-emerald-500/10' },
+      { title: 'Current Finished Stock', value: summary.currentInventory || 0, unit: 'packs', icon: Archive, color: 'text-orange-500 bg-orange-500/10' },
+      { title: 'Low Stock Alerts', value: summary.lowStockAlerts || 0, unit: 'warnings', icon: AlertTriangle, color: summary.lowStockAlerts > 0 ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-slate-400 bg-slate-400/10' },
+    ];
+  } else {
+    // Week or Custom (Default)
+    const week = summary.thisWeek || { production: 0, sales: 0, revenue: 0, profit: 0 };
+    cards = [
+      { title: 'Production (Week)', value: week.production || 0, unit: 'packs', icon: Package, color: 'text-blue-500 bg-blue-500/10' },
+      { title: 'Sales (Week)', value: week.sales || 0, unit: 'packs', icon: ShoppingBag, color: 'text-emerald-500 bg-emerald-500/10' },
+      { title: 'Revenue (Week)', value: `₹${(week.revenue || 0).toFixed(2)}`, unit: '', icon: DollarSign, color: 'text-amber-500 bg-amber-500/10' },
+      { title: 'Profit (Week)', value: `₹${(week.profit || 0).toFixed(2)}`, unit: '', icon: TrendingUp, color: 'text-teal-500 bg-teal-500/10' },
+      { title: 'Current Finished Stock', value: summary.currentInventory || 0, unit: 'packs', icon: Archive, color: 'text-orange-500 bg-orange-500/10' },
+      { title: 'Low Stock Alerts', value: summary.lowStockAlerts || 0, unit: 'warnings', icon: AlertTriangle, color: summary.lowStockAlerts > 0 ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-slate-400 bg-slate-400/10' },
+    ];
+  }
+
+  // Target warning calculations
+  const now = new Date();
+  const currentDay = now.getDate();
+  const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const elapsedRatio = currentDay / totalDays;
+  const revenueMonth = summary.thisMonth?.revenue || 0;
+
+  const expectedRevenue = activeTarget ? activeTarget.targetRevenue * elapsedRatio : 0;
+  const isBehind = activeTarget && revenueMonth < expectedRevenue;
+  const remainingTargetAmount = activeTarget ? Math.max(0, activeTarget.targetRevenue - revenueMonth) : 0;
+  const targetPercent = activeTarget ? Math.min(100, Math.round((revenueMonth / activeTarget.targetRevenue) * 100)) : 0;
 
   // Render Line Chart (Revenue & Profit) using pure SVG
   const renderTrendChart = () => {
@@ -77,11 +115,9 @@ export default function DashboardHome({ isDarkMode }) {
 
     const maxRev = Math.max(...data.map(d => Math.max(d.revenue, d.profit, 100)));
     
-    // Scale helper
     const getX = (index) => padding + (index * (width - padding * 2)) / Math.max(data.length - 1, 1);
     const getY = (val) => height - padding - (val * (height - padding * 2)) / maxRev;
 
-    // Build path strings
     let revPath = '';
     let profitPath = '';
     
@@ -161,7 +197,6 @@ export default function DashboardHome({ isDarkMode }) {
           })}
         </svg>
 
-        {/* Tooltip Overlay */}
         {hoveredDataPoint && (
           <div
             className="absolute bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 shadow-xl text-[10px] space-y-1 z-20 pointer-events-none"
@@ -192,10 +227,10 @@ export default function DashboardHome({ isDarkMode }) {
         {data.slice(0, 5).map((item, index) => {
           const pct = Math.max(5, (item.revenue / maxRev) * 100);
           return (
-            <div key={index} className="space-y-1">
+            <div key={index} className="space-y-1 text-left">
               <div className="flex justify-between text-xs font-semibold">
                 <span className="truncate max-w-[200px]">{item.name}</span>
-                <span className="text-slate-500 dark:text-slate-400">₹{item.revenue} ({item.quantity} packs)</span>
+                <span className="text-slate-500 dark:text-slate-400">₹{item.revenue.toFixed(0)} ({item.quantity} packs)</span>
               </div>
               <div className="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
                 <div
@@ -222,7 +257,7 @@ export default function DashboardHome({ isDarkMode }) {
         {data.map((item, index) => {
           const pct = Math.max(5, (item.stock / maxStock) * 100);
           return (
-            <div key={index} className="space-y-1">
+            <div key={index} className="space-y-1 text-left">
               <div className="flex justify-between text-xs font-semibold">
                 <span className="truncate max-w-[200px]">{item.name}</span>
                 <span className={`font-bold ${item.stock < 20 ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
@@ -288,13 +323,41 @@ export default function DashboardHome({ isDarkMode }) {
         )}
 
         <button
-          onClick={fetchStats}
+          onClick={fetchStatsAndTargets}
           className="flex items-center gap-1.5 text-xs text-saffron font-bold hover:text-orange-500 bg-saffron/10 px-3 py-1.5 rounded-xl transition-colors ml-auto sm:ml-0"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Reload Metrics</span>
         </button>
       </div>
+
+      {/* ---------------- SALES TARGETS SCHEDULE NOTIFICATION BANNERS ---------------- */}
+      {activeTarget && isBehind && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 p-4 rounded-2xl flex items-center gap-3 text-xs font-semibold text-left">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 text-red-500" />
+          <div className="flex-1">
+            <p className="font-bold text-sm">Monthly Sales Target Behind Schedule ({activeTarget.period})</p>
+            <p className="mt-1 text-slate-600 dark:text-slate-400 leading-normal">
+              You are currently behind the expected schedule for this month's revenue goal of ₹{activeTarget.targetRevenue.toFixed(0)}. 
+              Expected so far: ₹{expectedRevenue.toFixed(0)}, Actual: ₹{revenueMonth.toFixed(0)} ({targetPercent}% Achieved). 
+              Need to collect ₹{remainingTargetAmount.toFixed(0)} more by the end of the month.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {activeTarget && !isBehind && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 p-4 rounded-2xl flex items-center gap-3 text-xs font-semibold text-left">
+          <TrendingUp className="w-5 h-5 flex-shrink-0 text-emerald-500" />
+          <div className="flex-1">
+            <p className="font-bold text-sm">On Track for Monthly Goal ({activeTarget.period})</p>
+            <p className="mt-1 text-slate-650 dark:text-slate-450 leading-normal">
+              Excellent! You are on track for your monthly revenue target of ₹{activeTarget.targetRevenue.toFixed(0)}. 
+              Actual collections so far: ₹{revenueMonth.toFixed(0)} ({targetPercent}% Achieved). Keep up the great pace!
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ---------------- SUMMARY METRIC CARDS ---------------- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -386,7 +449,7 @@ export default function DashboardHome({ isDarkMode }) {
                   <div className="w-2.5 h-2.5 rounded-full bg-saffron mt-1.5 flex-shrink-0" />
                   <div className="flex-1 space-y-0.5 text-xs">
                     <p className="font-bold">{act.action}</p>
-                    <p className="text-slate-500 dark:text-slate-400">{act.details}</p>
+                    <p className="text-slate-555 dark:text-slate-400">{act.details}</p>
                     <span className="text-[10px] text-slate-400 block pt-1">{new Date(act.timestamp).toLocaleString()}</span>
                   </div>
                   <ArrowRight className="w-3.5 h-3.5 text-slate-300 self-center" />

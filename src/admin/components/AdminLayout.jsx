@@ -3,7 +3,7 @@ import { api } from '../api';
 import {
   LayoutDashboard, ClipboardList, Factory, FlaskConical, Search, Archive, Package,
   Store, Truck, Receipt, Wallet, CircleDollarSign, ArrowRightLeft, Users, Target,
-  FileBarChart, LogOut, Bell, Sun, Moon, Menu, X, ShieldAlert
+  FileBarChart, LogOut, Bell, Sun, Moon, Menu, X, ShieldAlert, ShoppingBag
 } from 'lucide-react';
 
 export default function AdminLayout({ user, currentTab, setCurrentTab, children, isDarkMode, setIsDarkMode }) {
@@ -54,6 +54,7 @@ export default function AdminLayout({ user, currentTab, setCurrentTab, children,
   const navItems = [
     { id: 'home', label: 'Dashboard Home', icon: LayoutDashboard },
     { id: 'daily-summary', label: 'Daily Business Summary', icon: ClipboardList },
+    { id: 'purchase-history', label: 'Ingredient Purchase History', icon: ShoppingBag },
     { id: 'production', label: 'Production Mgmt', icon: Factory },
     { id: 'recipes', label: 'Recipe & Batch Tracker', icon: FlaskConical },
     { id: 'traceability', label: 'Batch Traceability', icon: Search },
@@ -295,7 +296,7 @@ export default function AdminLayout({ user, currentTab, setCurrentTab, children,
 
         {/* ---------------- WORKSPACE CONTENT ---------------- */}
         <main ref={mainRef} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-7xl animate-fade-in-up">
+          <div className="mx-auto max-w-7xl">
             {children}
           </div>
         </main>

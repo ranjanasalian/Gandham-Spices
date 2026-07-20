@@ -11,171 +11,104 @@
   "products": [
     {
       "id": "biryani",
-      "sku": "GS-BM01",
+      "sku": "BM01",
       "name": "Biryani Marination Mix",
-      "category": "Spice Blends",
+      "category": "Masalas",
       "mrp": 120,
-      "wholesalePrice": 90,
-      "costPrice": 50,
+      "wholesalePrice": 100,
+      "costPrice": 51.67,
       "currentStock": 0,
       "status": "Active",
-      "packSize": "100g"
+      "packSize": "100g",
+      "totalProduced": 0,
+      "totalSold": 0,
+      "netProfit": 48.33,
+      "netMargin": 48.33,
+      "retailerMargin": 16.67,
+      "productionCost": 51.67
     },
     {
       "id": "rasam",
-      "sku": "GS-RP01",
+      "sku": "RP01",
       "name": "Temple-Style Rasam Powder",
-      "category": "Spice Powders",
-      "mrp": 60,
-      "wholesalePrice": 45,
-      "costPrice": 25,
+      "category": "Masalas",
+      "mrp": 50,
+      "wholesalePrice": 40,
+      "costPrice": 20.18,
       "currentStock": 0,
       "status": "Active",
-      "packSize": "50g"
+      "packSize": "50g",
+      "totalProduced": 0,
+      "totalSold": 0,
+      "netProfit": 19.82,
+      "netMargin": 49.55,
+      "retailerMargin": 20,
+      "productionCost": 20.18
     },
     {
       "id": "chicken-sukka",
-      "sku": "GS-CS01",
+      "sku": "CS01",
       "name": "Chicken Sukka Masala",
       "category": "Masalas",
       "mrp": 60,
-      "wholesalePrice": 45,
-      "costPrice": 25,
+      "wholesalePrice": 48,
+      "costPrice": 26.83,
       "currentStock": 0,
       "status": "Active",
-      "packSize": "50g"
+      "packSize": "50g",
+      "totalProduced": 0,
+      "totalSold": 0,
+      "netProfit": 21.17,
+      "netMargin": 44.1,
+      "retailerMargin": 20,
+      "productionCost": 26.83
+    },
+    {
+      "id": "prod_1784566787691",
+      "sku": "BM01",
+      "name": "Biryani Marination Mix",
+      "category": "Masalas",
+      "mrp": 70,
+      "retailerMargin": 20,
+      "wholesalePrice": 56,
+      "productionCost": 28.09,
+      "costPrice": 28.09,
+      "netProfit": 27.91,
+      "netMargin": 49.84,
+      "currentStock": 0,
+      "status": "Active",
+      "packSize": "50g",
+      "totalProduced": 0,
+      "totalSold": 0
+    },
+    {
+      "id": "prod_1784566873177",
+      "sku": "CS01",
+      "name": "Chicken Sukka Masala",
+      "category": "Masalas",
+      "mrp": 100,
+      "retailerMargin": 20,
+      "wholesalePrice": 80,
+      "productionCost": 49.18,
+      "costPrice": 49.18,
+      "netProfit": 30.82,
+      "netMargin": 38.52,
+      "currentStock": 0,
+      "status": "Active",
+      "packSize": "100g",
+      "totalProduced": 0,
+      "totalSold": 0
     }
   ],
   "rawMaterials": [
     {
-      "id": "rm1",
-      "name": "Red Chillies",
-      "currentStock": 0,
+      "id": "rm_1784568021410",
+      "name": "Byadgi Red Chilli",
       "unit": "kg",
-      "purchasePrice": 180,
-      "minStockLevel": 10,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm2",
-      "name": "Coriander Seeds",
-      "currentStock": 0,
-      "unit": "kg",
-      "purchasePrice": 120,
-      "minStockLevel": 8,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm3",
-      "name": "Cumin Seeds",
-      "currentStock": 0,
-      "unit": "kg",
-      "purchasePrice": 220,
-      "minStockLevel": 5,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm4",
-      "name": "Fenugreek",
-      "currentStock": 0,
-      "unit": "kg",
-      "purchasePrice": 100,
-      "minStockLevel": 3,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm5",
-      "name": "Pepper",
-      "currentStock": 0,
-      "unit": "kg",
-      "purchasePrice": 350,
-      "minStockLevel": 5,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm6",
-      "name": "Turmeric",
-      "currentStock": 0,
-      "unit": "kg",
-      "purchasePrice": 150,
-      "minStockLevel": 5,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm7",
-      "name": "Curry Leaves",
-      "currentStock": 0,
-      "unit": "kg",
-      "purchasePrice": 50,
-      "minStockLevel": 2,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm8",
-      "name": "Asafoetida",
-      "currentStock": 0,
-      "unit": "kg",
-      "purchasePrice": 1200,
       "minStockLevel": 1,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm9",
-      "name": "Pouches (100g)",
       "currentStock": 0,
-      "unit": "pcs",
-      "purchasePrice": 2.5,
-      "minStockLevel": 200,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm10",
-      "name": "Pouches (50g)",
-      "currentStock": 0,
-      "unit": "pcs",
-      "purchasePrice": 2,
-      "minStockLevel": 250,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm11",
-      "name": "Labels (Biryani Mix)",
-      "currentStock": 0,
-      "unit": "pcs",
-      "purchasePrice": 1.5,
-      "minStockLevel": 100,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm12",
-      "name": "Labels (Rasam Powder)",
-      "currentStock": 0,
-      "unit": "pcs",
-      "purchasePrice": 1.5,
-      "minStockLevel": 100,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
-    },
-    {
-      "id": "rm13",
-      "name": "Labels (Chicken Sukka)",
-      "currentStock": 0,
-      "unit": "pcs",
-      "purchasePrice": 1.5,
-      "minStockLevel": 100,
-      "purchaseDate": "2026-07-20",
-      "supplierId": ""
+      "totalPurchased": 0,
+      "totalUsed": 0
     }
   ],
   "recipes": [
@@ -334,5 +267,30 @@
     }
   ],
   "notifications": [],
-  "recentActivities": []
+  "recentActivities": [
+    {
+      "id": "a_1784568021411",
+      "action": "Added Raw Material",
+      "details": "Added Byadgi Red Chilli to raw materials inventory",
+      "timestamp": "2026-07-20T17:20:21.411Z"
+    },
+    {
+      "id": "a_1784567899746",
+      "action": "Added Raw Material",
+      "details": "Added Byadgi Red Chilli to raw materials inventory",
+      "timestamp": "2026-07-20T17:18:19.746Z"
+    },
+    {
+      "id": "a_1784566873177",
+      "action": "Added Product",
+      "details": "Added product Chicken Sukka Masala to registry",
+      "timestamp": "2026-07-20T17:01:13.177Z"
+    },
+    {
+      "id": "a_1784566787691",
+      "action": "Added Product",
+      "details": "Added product Biryani Marination Mix to registry",
+      "timestamp": "2026-07-20T16:59:47.691Z"
+    }
+  ]
 }
