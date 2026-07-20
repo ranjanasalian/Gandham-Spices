@@ -56,7 +56,7 @@ let collection = null;
 let dbCache = null;
 
 const mongoUri = process.env.MONGODB_URI;
-const FORCE_WIPE = false; // Set to true temporarily to clear the live database
+const FORCE_WIPE = process.env.WIPE_DATABASE === 'true';
 
 if (mongoUri) {
   try {
