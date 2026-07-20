@@ -7,6 +7,7 @@ import RecipePage from './pages/RecipePage.jsx'
 import RecipesPage from './pages/RecipesPage.jsx'
 import StoryPage from './pages/StoryPage.jsx'
 import NotFound from './pages/NotFound.jsx'
+import AdminApp from './admin/AdminApp.jsx'
 
 const router = createBrowserRouter([
   {
@@ -24,6 +25,10 @@ const router = createBrowserRouter([
   {
     path: '/our-story',
     element: <StoryPage />,
+  },
+  {
+    path: '/admin/*',
+    element: <AdminApp />,
   },
   {
     path: '/not-found',
