@@ -15,6 +15,7 @@ export default function AdminLayout({ user, currentTab, setCurrentTab, children,
     if (mainRef.current) {
       mainRef.current.scrollTop = 0;
     }
+    window.scrollTo(0, 0);
   }, [currentTab]);
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
