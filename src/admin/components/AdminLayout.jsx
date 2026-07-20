@@ -12,10 +12,16 @@ export default function AdminLayout({ user, currentTab, setCurrentTab, children,
 
   // Scroll to top of workspace container when tab changes
   useEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTop = 0;
-    }
-    window.scrollTo(0, 0);
+    const resetScroll = () => {
+      if (mainRef.current) {
+        mainRef.current.scrollTop = 0;
+      }
+      window.scrollTo(0, 0);
+    };
+    resetScroll();
+    // Safety fallback for slightly delayed DOM render cycles
+    const timer = setTimeout(resetScroll, 50);
+    return () => clearTimeout(timer);
   }, [currentTab]);
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -71,7 +77,7 @@ export default function AdminLayout({ user, currentTab, setCurrentTab, children,
   const unreadNotifs = notifications.filter(n => !n.read).length;
 
   return (
-    <div className={`min-h-screen flex ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} font-body transition-colors duration-200`}>
+    <div className={`h-screen overflow-hidden flex ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} font-body transition-colors duration-200`}>
       
       {/* ---------------- SIDEBAR (DESKTOP) ---------------- */}
       <aside className={`hidden lg:flex flex-col w-64 border-r ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex-shrink-0`}>
