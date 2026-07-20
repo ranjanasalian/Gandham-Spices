@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Archive, Plus, AlertCircle, CheckCircle2, RefreshCw, Trash2 } from 'lucide-react';
+import { Archive, Plus, AlertCircle, CheckCircle2, RefreshCw, Trash2, Edit2 } from 'lucide-react';
 
 export default function InventoryMgmt() {
   const [materials, setMaterials] = useState([]);
@@ -8,7 +8,8 @@ export default function InventoryMgmt() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Add New Item State
+  // Form & Editing States
+  const [editId, setEditId] = useState(null);
   const [newItemName, setNewItemName] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('kg');
   const [newItemMinStock, setNewItemMinStock] = useState('');
@@ -34,6 +35,23 @@ export default function InventoryMgmt() {
     loadData();
   }, []);
 
+  const handleEditClick = (m) => {
+    setEditId(m.id);
+    setNewItemName(m.name);
+    setNewItemUnit(m.unit);
+    setNewItemMinStock(m.minStockLevel.toString());
+    setError('');
+    setSuccess('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditId(null);
+    setNewItemName('');
+    setNewItemMinStock('');
+    setError('');
+    setSuccess('');
+  };
+
   const handleAddNewItem = async (e) => {
     e.preventDefault();
     setError('');
@@ -51,15 +69,22 @@ export default function InventoryMgmt() {
         minStockLevel: parseFloat(newItemMinStock)
       };
 
-      await api.rawMaterials.create(item);
-      setSuccess(`Raw material "${newItemName}" registered successfully.`);
+      if (editId) {
+        await api.rawMaterials.update(editId, item);
+        setSuccess(`Raw material details updated successfully.`);
+      } else {
+        await api.rawMaterials.create(item);
+        setSuccess(`Raw material "${newItemName}" registered successfully.`);
+      }
+
       setNewItemName('');
       setNewItemMinStock('');
+      setEditId(null);
       
       const rmData = await api.rawMaterials.getAll();
       setMaterials(rmData);
     } catch (err) {
-      setError('Failed to add new raw material type');
+      setError(editId ? 'Failed to update raw material details' : 'Failed to add new raw material type');
     }
   };
 
@@ -125,13 +150,13 @@ export default function InventoryMgmt() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* ---------------- REGISTRATION FORM ---------------- */}
+        {/* ---------------- REGISTRATION / EDIT FORM ---------------- */}
         <div className="space-y-6">
           
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm">
             <h3 className="text-base font-bold flex items-center gap-2 mb-4 border-b pb-2">
               <Plus className="w-5 h-5 text-saffron" />
-              <span>Register Raw Material</span>
+              <span>{editId ? 'Modify Raw Material' : 'Register Raw Material'}</span>
             </h3>
 
             <form onSubmit={handleAddNewItem} className="space-y-4 text-xs">
@@ -176,12 +201,23 @@ export default function InventoryMgmt() {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-3 bg-gradient-to-r from-saffron to-orange-500 text-white font-bold rounded-2xl hover:shadow active:scale-[0.98]"
-              >
-                Register Item Type
-              </button>
+              <div className="space-y-2">
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-gradient-to-r from-saffron to-orange-500 text-white font-bold rounded-2xl hover:shadow active:scale-[0.98]"
+                >
+                  {editId ? 'Save Changes' : 'Register Item Type'}
+                </button>
+                {editId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 font-bold rounded-xl transition-all"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 
@@ -287,13 +323,20 @@ export default function InventoryMgmt() {
                             {isLow ? 'LOW STOCK' : 'OK'}
                           </span>
                         </td>
-                        <td className="py-3 px-2 text-center">
+                        <td className="py-3 px-2 text-center flex justify-center items-center gap-1.5">
+                          <button
+                            onClick={() => handleEditClick(m)}
+                            className="p-1.5 text-slate-400 hover:text-saffron hover:bg-saffron/10 rounded-xl transition-colors"
+                            title="Edit Raw Material"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => triggerSingleDelete(m.id)}
                             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
                             title="Delete Raw Material"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
                       </tr>
