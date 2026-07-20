@@ -1,7 +1,10 @@
 {
   "cleanUrls": true,
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/:path*", "destination": "/index.html" },
+    { "source": "/our-story", "destination": "/index.html" },
+    { "source": "/recipes", "destination": "/index.html" },
+    { "source": "/recipes/:path*", "destination": "/index.html" }
   ]
 }
