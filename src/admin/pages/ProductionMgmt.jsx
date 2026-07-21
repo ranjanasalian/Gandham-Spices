@@ -252,6 +252,25 @@ export default function ProductionMgmt() {
     }
   };
 
+  const getProductWholesalePrice = (prod) => {
+    if (!prod) return 0;
+    const mrp = parseFloat(prod.mrp) || 0;
+    const margin = parseFloat(prod.retailerMargin) || 0;
+    return mrp * (1 - margin / 100);
+  };
+
+  const selectedProduct = products.find(p => p.id === productId);
+  const mrpPerPouch = selectedProduct ? parseFloat(selectedProduct.mrp || 0) : 0;
+  const wholesalePerPouch = selectedProduct ? getProductWholesalePrice(selectedProduct) : 0;
+
+  const weightKgForEst = parseFloat(quantityProduced) || 0;
+  const pouchGramsForEst = getPouchSizeGrams(packSize);
+  const estimatedPouches = pouchGramsForEst > 0 ? Math.floor((weightKgForEst * 1000) / pouchGramsForEst) : 0;
+
+  const qtyProducedVal = parseInt(packetsProduced, 10) || 0;
+  const totalMrpValue = qtyProducedVal * mrpPerPouch;
+  const totalWholesaleValue = qtyProducedVal * wholesalePerPouch;
+
   const calculatedCostPerPacket = () => {
     const packs = parseInt(packetsProduced, 10);
     const cost = parseFloat(manufacturingCost);
@@ -413,11 +432,23 @@ export default function ProductionMgmt() {
               </div>
             </div>
 
-            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl flex justify-between items-center text-xs">
-              <span className="font-semibold text-slate-500">Cost per Pouch (MRP):</span>
-              <span className="font-black text-saffron text-sm">
-                ₹{products.find(p => p.id === productId) ? parseFloat(products.find(p => p.id === productId).mrp || 0).toFixed(2) : '0.00'}
-              </span>
+            <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-2xl space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-500">Cost per Pouch (MRP):</span>
+                <span className="font-black text-saffron text-sm">₹{mrpPerPouch.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-slate-200/50 dark:border-slate-700/50 pt-2">
+                <span className="font-semibold text-slate-500">Estimated Pouches:</span>
+                <span className="font-bold text-slate-700 dark:text-slate-300">{estimatedPouches} packs</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-500">Total MRP Value:</span>
+                <span className="font-bold text-slate-700 dark:text-slate-300">₹{totalMrpValue.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-500">Total Wholesale Value:</span>
+                <span className="font-bold text-slate-700 dark:text-slate-300">₹{totalWholesaleValue.toFixed(2)}</span>
+              </div>
             </div>
 
             <div>
