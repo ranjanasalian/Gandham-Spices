@@ -1040,6 +1040,7 @@ app.post('/api/admin/customers', authenticateToken, async (req, res) => {
     phoneNumber, 
     address, 
     productId, 
+    batchId, 
     quantityGiven, 
     amountReceived, 
     paymentDate, 
@@ -1049,7 +1050,20 @@ app.post('/api/admin/customers', authenticateToken, async (req, res) => {
   const product = db.products.find(p => p.id === productId);
   if (!product) return res.status(400).json({ message: 'Selected product not found in master catalog.' });
 
+  const batch = db.batches.find(b => b.id === batchId);
+  if (!batch) return res.status(400).json({ message: 'Selected production batch not found.' });
+
+  if (batch.productId !== productId) {
+    return res.status(400).json({ message: 'Selected batch does not match the product.' });
+  }
+
   const qty = parseInt(quantityGiven, 10) || 0;
+  if (batch.remainingStock < qty) {
+    return res.status(400).json({ 
+      message: `Insufficient stock in batch ${batch.batchNumber}. Available: ${batch.remainingStock}, Requested: ${qty}`
+    });
+  }
+
   const received = parseFloat(amountReceived || 0);
   
   // Calculate Wholesale Price
@@ -1058,6 +1072,9 @@ app.post('/api/admin/customers', authenticateToken, async (req, res) => {
   const wholesale = parseFloat((mrpValue * (1 - margin / 100)).toFixed(2));
   const totalReceivable = parseFloat((qty * wholesale).toFixed(2));
   const balance = parseFloat((totalReceivable - received).toFixed(2));
+
+  // Deduct remaining stock in batch
+  batch.remainingStock -= qty;
 
   const newCustomer = {
     id: `c_${Date.now()}`,
@@ -1069,6 +1086,8 @@ app.post('/api/admin/customers', authenticateToken, async (req, res) => {
     address: address || '',
     productId,
     productName: product.name,
+    batchId,
+    batchNumber: batch.batchNumber,
     packSize: product.packSize,
     quantityGiven: qty,
     wholesalePrice: wholesale,
@@ -1100,19 +1119,98 @@ app.put('/api/admin/customers/:id', authenticateToken, async (req, res) => {
   if (index === -1) return res.status(404).json({ message: 'Customer record not found' });
 
   const current = db.customers[index];
-  const { amountReceived, paymentStatus, paymentDate, remarks } = req.body;
+  const { 
+    date,
+    contactName, 
+    shopName, 
+    customerClassification, 
+    phoneNumber, 
+    address, 
+    productId, 
+    batchId, 
+    quantityGiven, 
+    amountReceived, 
+    paymentStatus,
+    paymentDate, 
+    remarks 
+  } = req.body;
 
-  const received = parseFloat(amountReceived ?? current.amountReceived);
-  const totalReceivable = current.totalAmountReceivable;
+  const prodId = productId || current.productId;
+  const product = db.products.find(p => p.id === prodId);
+  if (!product) return res.status(400).json({ message: 'Product not found' });
+
+  const qty = parseInt(quantityGiven !== undefined ? quantityGiven : current.quantityGiven, 10) || 0;
+  const targetBatchId = batchId || current.batchId;
+
+  // Revert old batch stock first
+  if (current.batchId) {
+    const oldBatch = db.batches.find(b => b.id === current.batchId);
+    if (oldBatch) {
+      oldBatch.remainingStock += current.quantityGiven;
+    }
+  }
+
+  // Find new batch and validate stock
+  const newBatch = db.batches.find(b => b.id === targetBatchId);
+  if (!newBatch) {
+    if (current.batchId) {
+      const oldBatch = db.batches.find(b => b.id === current.batchId);
+      if (oldBatch) oldBatch.remainingStock -= current.quantityGiven;
+    }
+    return res.status(400).json({ message: 'Selected batch not found.' });
+  }
+
+  if (newBatch.productId !== prodId) {
+    if (current.batchId) {
+      const oldBatch = db.batches.find(b => b.id === current.batchId);
+      if (oldBatch) oldBatch.remainingStock -= current.quantityGiven;
+    }
+    return res.status(400).json({ message: 'Selected batch does not match the product.' });
+  }
+
+  if (newBatch.remainingStock < qty) {
+    if (current.batchId) {
+      const oldBatch = db.batches.find(b => b.id === current.batchId);
+      if (oldBatch) oldBatch.remainingStock -= current.quantityGiven;
+    }
+    return res.status(400).json({ 
+      message: `Insufficient stock in batch ${newBatch.batchNumber}. Available: ${newBatch.remainingStock}, Requested: ${qty}`
+    });
+  }
+
+  // Apply new stock deduction
+  newBatch.remainingStock -= qty;
+
+  const received = parseFloat(amountReceived !== undefined ? amountReceived : current.amountReceived);
+  
+  // Calculate Wholesale Price
+  const mrpValue = parseFloat(product.mrp || 0);
+  const margin = parseFloat(product.retailerMargin || 0);
+  const wholesale = parseFloat((mrpValue * (1 - margin / 100)).toFixed(2));
+  const totalReceivable = parseFloat((qty * wholesale).toFixed(2));
   const balance = parseFloat((totalReceivable - received).toFixed(2));
 
   db.customers[index] = { 
     ...current,
+    date: date || current.date,
+    contactName: contactName || current.contactName,
+    shopName: shopName || current.shopName,
+    customerClassification: customerClassification || current.customerClassification,
+    phoneNumber: phoneNumber !== undefined ? phoneNumber : current.phoneNumber,
+    address: address !== undefined ? address : current.address,
+    productId: prodId,
+    productName: product.name,
+    batchId: targetBatchId,
+    batchNumber: newBatch.batchNumber,
+    packSize: product.packSize,
+    quantityGiven: qty,
+    wholesalePrice: wholesale,
+    totalAmountReceivable: totalReceivable,
     amountReceived: received,
     balanceAmount: balance,
     paymentStatus: paymentStatus || (balance <= 0 ? 'Paid' : 'Pending'),
-    paymentDate: paymentDate ?? current.paymentDate,
-    remarks: remarks ?? current.remarks
+    paymentDate: paymentDate !== undefined ? paymentDate : current.paymentDate,
+    remarks: remarks !== undefined ? remarks : current.remarks
   };
 
   await commit();
@@ -1125,6 +1223,13 @@ app.delete('/api/admin/customers/:id', authenticateToken, async (req, res) => {
   if (index === -1) return res.status(404).json({ message: 'Customer record not found' });
 
   const deleted = db.customers.splice(index, 1)[0];
+  if (deleted.batchId) {
+    const batch = db.batches.find(b => b.id === deleted.batchId);
+    if (batch) {
+      batch.remainingStock += deleted.quantityGiven;
+    }
+  }
+
   await commit();
   res.json({ message: 'Customer supply record deleted', customer: deleted });
 });

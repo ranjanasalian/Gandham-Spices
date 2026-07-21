@@ -5,6 +5,7 @@ import { Store, Plus, Edit2, Trash2, AlertCircle, CheckCircle2, User, Phone, Map
 export default function ShopCustomerMgmt() {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -20,6 +21,7 @@ export default function ShopCustomerMgmt() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
   const [productId, setProductId] = useState('');
+  const [batchId, setBatchId] = useState('');
   const [quantityGiven, setQuantityGiven] = useState('');
   const [amountReceived, setAmountReceived] = useState('0');
   const [paymentStatus, setPaymentStatus] = useState('Pending');
@@ -33,6 +35,8 @@ export default function ShopCustomerMgmt() {
       setCustomers(cData);
       const pData = await api.products.getAll();
       setProducts(pData);
+      const bData = await api.batches.getAll();
+      setBatches(bData);
     } catch (err) {
       setError('Failed to fetch ledger information');
     } finally {
@@ -53,6 +57,7 @@ export default function ShopCustomerMgmt() {
     setPhoneNumber('');
     setAddress('');
     setProductId('');
+    setBatchId('');
     setQuantityGiven('');
     setAmountReceived('0');
     setPaymentStatus('Pending');
@@ -70,6 +75,7 @@ export default function ShopCustomerMgmt() {
     setPhoneNumber(c.phoneNumber || '');
     setAddress(c.address || '');
     setProductId(c.productId || '');
+    setBatchId(c.batchId || '');
     setQuantityGiven((c.quantityGiven || 0).toString());
     setAmountReceived((c.amountReceived || 0).toString());
     setPaymentStatus(c.paymentStatus || 'Pending');
@@ -95,6 +101,10 @@ export default function ShopCustomerMgmt() {
       setError('Please select a Product');
       return;
     }
+    if (!batchId) {
+      setError('Please select a Production Batch');
+      return;
+    }
     if (!quantityGiven || parseInt(quantityGiven, 10) <= 0) {
       setError('Please provide a valid quantity of pouches supplied');
       return;
@@ -109,6 +119,7 @@ export default function ShopCustomerMgmt() {
         phoneNumber,
         address,
         productId,
+        batchId,
         quantityGiven: parseInt(quantityGiven, 10),
         amountReceived: parseFloat(amountReceived || 0),
         paymentStatus,
@@ -369,7 +380,10 @@ export default function ShopCustomerMgmt() {
                   <select
                     id="sales-product-select"
                     value={productId}
-                    onChange={(e) => setProductId(e.target.value)}
+                    onChange={(e) => {
+                      setProductId(e.target.value);
+                      setBatchId(''); // Reset batch when product changes
+                    }}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron"
                   >
                     <option value="">Select product item</option>
@@ -388,6 +402,27 @@ export default function ShopCustomerMgmt() {
                     disabled
                     className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl text-slate-400 font-bold"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label htmlFor="sales-batch-select" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Select Production Batch *</label>
+                  <select
+                    id="sales-batch-select"
+                    value={batchId}
+                    onChange={(e) => setBatchId(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron"
+                  >
+                    <option value="">Select production batch</option>
+                    {batches
+                      .filter(b => b.productId === productId)
+                      .map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.batchNumber} - {b.batchCode || 'No Code'} (Available: {b.remainingStock} packs)
+                        </option>
+                      ))}
+                  </select>
                 </div>
               </div>
 
@@ -506,6 +541,7 @@ export default function ShopCustomerMgmt() {
                 <th className="py-3 px-2">Contact Person</th>
                 <th className="py-3 px-2">Classification</th>
                 <th className="py-3 px-2">Product Name</th>
+                <th className="py-3 px-2 text-center">Batch</th>
                 <th className="py-3 px-2 text-center">Pouch Size</th>
                 <th className="py-3 px-2 text-center">Qty Supplied</th>
                 <th className="py-3 px-2 text-right">Wholesale Rate</th>
@@ -519,7 +555,7 @@ export default function ShopCustomerMgmt() {
             <tbody>
               {customers.length === 0 ? (
                 <tr>
-                  <td colSpan="13" className="text-center py-10 text-slate-400">
+                  <td colSpan="14" className="text-center py-10 text-slate-400">
                     No transactions recorded. Record a supply transaction above to start tracking.
                   </td>
                 </tr>
@@ -545,6 +581,7 @@ export default function ShopCustomerMgmt() {
                         </span>
                       </td>
                       <td className="py-3 px-2 font-bold">{c.productName}</td>
+                      <td className="py-3 px-2 text-center font-bold text-saffron">{c.batchNumber || '—'}</td>
                       <td className="py-3 px-2 text-center text-slate-500 font-semibold">{c.packSize}</td>
                       <td className="py-3 px-2 text-center font-black text-slate-700 dark:text-slate-300">{c.quantityGiven} pouches</td>
                       <td className="py-3 px-2 text-right font-medium text-slate-500">₹{c.wholesalePrice}</td>
