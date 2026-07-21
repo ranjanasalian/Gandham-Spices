@@ -67,19 +67,37 @@ export default function ProductionMgmt() {
     }
   }, [productId, recipes, products]);
 
-  // Sync auto-calculate production cost when product or batch weight changes
+  // Helper: Get pouch size in grams from pack size string
+  const getPouchSizeGrams = (sizeStr) => {
+    if (!sizeStr) return 100; // default to 100g
+    const clean = sizeStr.toLowerCase().replace(/\s+/g, '');
+    const num = parseFloat(clean);
+    if (isNaN(num)) return 100;
+    if (clean.endsWith('kg')) return num * 1000;
+    return num; // assume grams
+  };
+
+  // Sync auto-calculate pouches count and total production cost
   useEffect(() => {
-    if (productId && quantityProduced) {
+    if (productId && quantityProduced && packSize) {
       const prod = products.find(p => p.id === productId);
       if (prod) {
         const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
-        const weight = parseFloat(quantityProduced);
-        if (!isNaN(costPerPack) && !isNaN(weight) && weight > 0) {
-          setManufacturingCost((costPerPack * weight).toFixed(2));
+        const weightKg = parseFloat(quantityProduced);
+        const pouchGrams = getPouchSizeGrams(packSize);
+
+        if (!isNaN(weightKg) && weightKg > 0 && pouchGrams > 0) {
+          const totalWeightGrams = weightKg * 1000;
+          const calculatedPouchesCount = Math.floor(totalWeightGrams / pouchGrams);
+          setPacketsProduced(calculatedPouchesCount.toString());
+
+          if (!isNaN(costPerPack) && costPerPack >= 0) {
+            setManufacturingCost((calculatedPouchesCount * costPerPack).toFixed(2));
+          }
         }
       }
     }
-  }, [productId, quantityProduced, products]);
+  }, [productId, quantityProduced, packSize, products]);
 
   const handleEditClick = (b) => {
     setEditId(b.id);
@@ -418,13 +436,13 @@ export default function ProductionMgmt() {
         </div>
 
         {/* ---------------- PRODUCTION HISTORY LOG ---------------- */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col min-h-[450px]">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col min-h-[450px] overflow-hidden max-w-full">
           <h3 className="text-lg font-bold flex items-center gap-2 mb-6 border-b border-slate-100 dark:border-slate-800 pb-3 text-left">
             <Package className="w-5 h-5 text-saffron" />
             <span>Complete Production History</span>
           </h3>
 
-          <div className="overflow-x-auto max-h-[400px] overflow-y-auto flex-1">
+          <div className="w-full max-w-full overflow-x-auto max-h-[400px] overflow-y-auto flex-1">
             <table className="w-full text-xs text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
