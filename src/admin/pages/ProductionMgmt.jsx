@@ -51,22 +51,6 @@ export default function ProductionMgmt() {
     loadData();
   }, []);
 
-  // Sync recipe when product changes
-  useEffect(() => {
-    if (productId) {
-      const matchingRecipe = recipes.find(r => r.productId === productId);
-      if (matchingRecipe) {
-        setRecipeId(matchingRecipe.id);
-        const prod = products.find(p => p.id === productId);
-        if (prod) {
-          setPackSize(prod.packSize);
-        }
-      } else {
-        setRecipeId('');
-      }
-    }
-  }, [productId, recipes, products]);
-
   // Helper: Get pouch size in grams from pack size string
   const getPouchSizeGrams = (sizeStr) => {
     if (!sizeStr) return 100; // default to 100g
@@ -77,27 +61,72 @@ export default function ProductionMgmt() {
     return num; // assume grams
   };
 
-  // Sync auto-calculate pouches count and total production cost
-  useEffect(() => {
-    if (productId && quantityProduced && packSize) {
-      const prod = products.find(p => p.id === productId);
-      if (prod) {
-        const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
+  const handleProductChange = (val) => {
+    setProductId(val);
+    if (!val) {
+      setRecipeId('');
+      return;
+    }
+    const prod = products.find(p => p.id === val);
+    if (prod) {
+      const defaultPackSize = prod.packSize || '100g';
+      setPackSize(defaultPackSize);
+      if (quantityProduced) {
         const weightKg = parseFloat(quantityProduced);
-        const pouchGrams = getPouchSizeGrams(packSize);
-
+        const pouchGrams = getPouchSizeGrams(defaultPackSize);
+        const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
         if (!isNaN(weightKg) && weightKg > 0 && pouchGrams > 0) {
-          const totalWeightGrams = weightKg * 1000;
-          const calculatedPouchesCount = Math.floor(totalWeightGrams / pouchGrams);
-          setPacketsProduced(calculatedPouchesCount.toString());
-
-          if (!isNaN(costPerPack) && costPerPack >= 0) {
-            setManufacturingCost((calculatedPouchesCount * costPerPack).toFixed(2));
-          }
+          const pouches = Math.floor((weightKg * 1000) / pouchGrams);
+          setPacketsProduced(pouches.toString());
+          setManufacturingCost((pouches * costPerPack).toFixed(2));
         }
       }
     }
-  }, [productId, quantityProduced, packSize, products]);
+    const matchingRecipe = recipes.find(r => r.productId === val);
+    setRecipeId(matchingRecipe ? matchingRecipe.id : '');
+  };
+
+  const handleWeightChange = (val) => {
+    setQuantityProduced(val);
+    const prod = products.find(p => p.id === productId);
+    if (prod && val) {
+      const weightKg = parseFloat(val);
+      const pouchGrams = getPouchSizeGrams(packSize);
+      const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
+      if (!isNaN(weightKg) && weightKg > 0 && pouchGrams > 0) {
+        const pouches = Math.floor((weightKg * 1000) / pouchGrams);
+        setPacketsProduced(pouches.toString());
+        setManufacturingCost((pouches * costPerPack).toFixed(2));
+      }
+    }
+  };
+
+  const handlePackSizeChange = (val) => {
+    setPackSize(val);
+    const prod = products.find(p => p.id === productId);
+    if (prod && quantityProduced && val) {
+      const weightKg = parseFloat(quantityProduced);
+      const pouchGrams = getPouchSizeGrams(val);
+      const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
+      if (!isNaN(weightKg) && weightKg > 0 && pouchGrams > 0) {
+        const pouches = Math.floor((weightKg * 1000) / pouchGrams);
+        setPacketsProduced(pouches.toString());
+        setManufacturingCost((pouches * costPerPack).toFixed(2));
+      }
+    }
+  };
+
+  const handlePacketsProducedChange = (val) => {
+    setPacketsProduced(val);
+    const prod = products.find(p => p.id === productId);
+    if (prod && val) {
+      const pouches = parseInt(val, 10);
+      const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
+      if (!isNaN(pouches) && pouches > 0 && costPerPack >= 0) {
+        setManufacturingCost((pouches * costPerPack).toFixed(2));
+      }
+    }
+  };
 
   const handleEditClick = (b) => {
     setEditId(b.id);
@@ -271,7 +300,7 @@ export default function ProductionMgmt() {
               <select
                 id="finished-product-select"
                 value={productId}
-                onChange={(e) => setProductId(e.target.value)}
+                onChange={(e) => handleProductChange(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
               >
                 <option value="">Select manufactured product</option>
@@ -338,7 +367,7 @@ export default function ProductionMgmt() {
                   step="0.01"
                   placeholder="e.g. 10.0"
                   value={quantityProduced}
-                  onChange={(e) => setQuantityProduced(e.target.value)}
+                  onChange={(e) => handleWeightChange(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:ring-1 focus:ring-saffron focus:outline-none"
                 />
               </div>
@@ -347,7 +376,7 @@ export default function ProductionMgmt() {
                 <select
                   id="pack-size-select"
                   value={packSize}
-                  onChange={(e) => setPackSize(e.target.value)}
+                  onChange={(e) => handlePackSizeChange(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:ring-1 focus:ring-saffron focus:outline-none"
                 >
                   <option value="50g">50g</option>
@@ -367,7 +396,7 @@ export default function ProductionMgmt() {
                   type="number"
                   placeholder="Total pouches count"
                   value={packetsProduced}
-                  onChange={(e) => setPacketsProduced(e.target.value)}
+                  onChange={(e) => handlePacketsProducedChange(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:ring-1 focus:ring-saffron focus:outline-none"
                 />
               </div>
