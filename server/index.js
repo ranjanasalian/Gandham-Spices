@@ -912,6 +912,106 @@ app.get('/api/admin/batches/trace/:batchNumber', authenticateToken, (req, res) =
   });
 });
 
+app.put('/api/admin/batches/:id', authenticateToken, async (req, res) => {
+  const db = getDB();
+  const index = db.batches.findIndex(b => b.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Batch not found' });
+
+  const current = db.batches[index];
+  const { productId, batchNumber, batchCode, manufacturingDate, bestBeforeDate, packSize, packetsProduced, manufacturingCost, quantityProduced, notes } = req.body;
+
+  const prodId = productId || current.productId;
+  const product = db.products.find(p => p.id === prodId);
+  if (!product) return res.status(400).json({ message: 'Product not found' });
+
+  const packetsCount = parseInt(packetsProduced !== undefined ? packetsProduced : current.packetsProduced, 10) || 0;
+  const mfgCost = parseFloat(manufacturingCost !== undefined ? manufacturingCost : current.manufacturingCost) || 0;
+
+  // Validate raw spices (temporary update check excluding current batch)
+  const recipe = db.recipes.find(r => r.productId === prodId);
+  if (recipe) {
+    const missingMaterials = [];
+    recipe.ingredients.forEach(ing => {
+      const rm = db.rawMaterials.find(m => m.id === ing.rawMaterialId);
+      if (!rm) return;
+      
+      const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
+      const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
+      let totalUsed = 0;
+      db.batches.forEach(b => {
+        if (b.id === req.params.id) return;
+
+        const r = db.recipes.find(rec => rec.id === b.recipeId);
+        if (r) {
+          const rIng = r.ingredients.find(ri => ri.rawMaterialId === rm.id);
+          if (rIng) {
+            const p = db.products.find(prod => prod.id === r.productId);
+            const pSizeKg = parsePackSizeToKg(p ? p.packSize : '');
+            const rIngQtyInRmUnit = convertUnit(rIng.quantity, rIng.unit || 'kg', rm.unit);
+            totalUsed += rIngQtyInRmUnit * b.packetsProduced * pSizeKg;
+          }
+        }
+      });
+      const currentStock = totalPurchased - totalUsed;
+      const ingQtyInRmUnit = convertUnit(ing.quantity, ing.unit || 'kg', rm.unit);
+      const pSizeKg = parsePackSizeToKg(product.packSize);
+      const needed = ingQtyInRmUnit * packetsCount * pSizeKg;
+
+      if (currentStock < needed) {
+        missingMaterials.push(`Insufficient stock for ${rm.name}. Needed: ${needed.toFixed(3)} ${rm.unit}, Current: ${currentStock.toFixed(3)} ${rm.unit}`);
+      }
+    });
+
+    if (missingMaterials.length > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot update production batch. Raw material shortages:',
+        errors: missingMaterials
+      });
+    }
+  }
+
+  // Update batch fields
+  db.batches[index] = {
+    ...current,
+    productId: prodId,
+    recipeId: recipe ? recipe.id : '',
+    batchNumber: batchNumber || current.batchNumber,
+    batchCode: batchCode || current.batchCode,
+    manufacturingDate: manufacturingDate || current.manufacturingDate,
+    bestBeforeDate: bestBeforeDate !== undefined ? bestBeforeDate : current.bestBeforeDate,
+    quantityProduced: quantityProduced !== undefined ? parseFloat(quantityProduced) : current.quantityProduced,
+    packSize: packSize || current.packSize,
+    packetsProduced: packetsCount,
+    manufacturingCost: mfgCost,
+    costPerPacket: packetsCount > 0 ? parseFloat((mfgCost / packetsCount).toFixed(2)) : 0,
+    notes: notes !== undefined ? notes : current.notes,
+    remainingStock: packetsCount
+  };
+  const updated = db.batches[index];
+
+  // Update auto-logged expense
+  const expenseIndex = db.expenses.findIndex(e => e.id === `e_prod_${updated.id}`);
+  if (expenseIndex !== -1) {
+    db.expenses[expenseIndex] = {
+      ...db.expenses[expenseIndex],
+      amount: mfgCost,
+      date: updated.manufacturingDate,
+      description: `Production cost for batch ${updated.batchNumber} (${packetsCount} pouches of ${product.name})`
+    };
+  } else {
+    db.expenses.push({
+      id: `e_prod_${updated.id}`,
+      category: 'Production',
+      amount: mfgCost,
+      date: updated.manufacturingDate,
+      description: `Production cost for batch ${updated.batchNumber} (${packetsCount} pouches of ${product.name})`
+    });
+  }
+
+  await commit();
+  res.json(updated);
+});
+
 app.delete('/api/admin/batches/:id', authenticateToken, async (req, res) => {
   const db = getDB();
   const index = db.batches.findIndex(b => b.id === req.params.id);

@@ -147,6 +147,10 @@ export const api = {
       body: JSON.stringify(batch)
     }),
     trace: (batchNumber) => request(`/admin/batches/trace/${batchNumber}`),
+    update: (id, batch) => request(`/admin/batches/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(batch)
+    }),
     delete: (id) => request(`/admin/batches/${id}`, {
       method: 'DELETE'
     })
