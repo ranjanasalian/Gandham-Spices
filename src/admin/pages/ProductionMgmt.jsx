@@ -76,9 +76,8 @@ export default function ProductionMgmt() {
         const pouchGrams = getPouchSizeGrams(defaultPackSize);
         const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
         if (!isNaN(weightKg) && weightKg > 0 && pouchGrams > 0) {
-          const pouches = Math.floor((weightKg * 1000) / pouchGrams);
-          setPacketsProduced(pouches.toString());
-          setManufacturingCost((pouches * costPerPack).toFixed(2));
+          const estimatedPouches = Math.floor((weightKg * 1000) / pouchGrams);
+          setManufacturingCost((estimatedPouches * costPerPack).toFixed(2));
         }
       }
     }
@@ -94,9 +93,8 @@ export default function ProductionMgmt() {
       const pouchGrams = getPouchSizeGrams(packSize);
       const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
       if (!isNaN(weightKg) && weightKg > 0 && pouchGrams > 0) {
-        const pouches = Math.floor((weightKg * 1000) / pouchGrams);
-        setPacketsProduced(pouches.toString());
-        setManufacturingCost((pouches * costPerPack).toFixed(2));
+        const estimatedPouches = Math.floor((weightKg * 1000) / pouchGrams);
+        setManufacturingCost((estimatedPouches * costPerPack).toFixed(2));
       }
     }
   };
@@ -109,23 +107,14 @@ export default function ProductionMgmt() {
       const pouchGrams = getPouchSizeGrams(val);
       const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
       if (!isNaN(weightKg) && weightKg > 0 && pouchGrams > 0) {
-        const pouches = Math.floor((weightKg * 1000) / pouchGrams);
-        setPacketsProduced(pouches.toString());
-        setManufacturingCost((pouches * costPerPack).toFixed(2));
+        const estimatedPouches = Math.floor((weightKg * 1000) / pouchGrams);
+        setManufacturingCost((estimatedPouches * costPerPack).toFixed(2));
       }
     }
   };
 
   const handlePacketsProducedChange = (val) => {
     setPacketsProduced(val);
-    const prod = products.find(p => p.id === productId);
-    if (prod && val) {
-      const pouches = parseInt(val, 10);
-      const costPerPack = parseFloat(prod.productionCost || prod.costPrice || 0);
-      if (!isNaN(pouches) && pouches > 0 && costPerPack >= 0) {
-        setManufacturingCost((pouches * costPerPack).toFixed(2));
-      }
-    }
   };
 
   const handleEditClick = (b) => {
@@ -261,6 +250,7 @@ export default function ProductionMgmt() {
 
   const selectedProduct = products.find(p => p.id === productId);
   const mrpPerPouch = selectedProduct ? parseFloat(selectedProduct.mrp || 0) : 0;
+  const prodCostPerPouch = selectedProduct ? parseFloat(selectedProduct.productionCost || selectedProduct.costPrice || 0) : 0;
   const wholesalePerPouch = selectedProduct ? getProductWholesalePrice(selectedProduct) : 0;
 
   const weightKgForEst = parseFloat(quantityProduced) || 0;
@@ -268,7 +258,8 @@ export default function ProductionMgmt() {
   const estimatedPouches = pouchGramsForEst > 0 ? Math.floor((weightKgForEst * 1000) / pouchGramsForEst) : 0;
 
   const qtyProducedVal = parseInt(packetsProduced, 10) || 0;
-  const totalMrpValue = qtyProducedVal * mrpPerPouch;
+  const totalCostOfPouchesMrp = qtyProducedVal * mrpPerPouch;
+  const totalCostOfPouchesProd = qtyProducedVal * prodCostPerPouch;
   const totalWholesaleValue = qtyProducedVal * wholesalePerPouch;
 
   const calculatedCostPerPacket = () => {
@@ -434,7 +425,7 @@ export default function ProductionMgmt() {
 
             <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-2xl space-y-2 text-xs">
               <div className="flex justify-between items-center">
-                <span className="font-semibold text-slate-500">Cost per Pouch (MRP):</span>
+                <span className="font-semibold text-slate-500">Pouch Cost (MRP):</span>
                 <span className="font-black text-saffron text-sm">₹{mrpPerPouch.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center border-t border-slate-200/50 dark:border-slate-700/50 pt-2">
@@ -442,8 +433,12 @@ export default function ProductionMgmt() {
                 <span className="font-bold text-slate-700 dark:text-slate-300">{estimatedPouches} packs</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="font-semibold text-slate-500">Total MRP Value:</span>
-                <span className="font-bold text-slate-700 dark:text-slate-300">₹{totalMrpValue.toFixed(2)}</span>
+                <span className="font-semibold text-slate-500">Total Cost of Pouches (MRP):</span>
+                <span className="font-bold text-slate-700 dark:text-slate-300">₹{totalCostOfPouchesMrp.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-500">Total Cost of Pouches (Prod. Cost):</span>
+                <span className="font-bold text-slate-700 dark:text-slate-300">₹{totalCostOfPouchesProd.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-slate-500">Total Wholesale Value:</span>
