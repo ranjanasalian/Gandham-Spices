@@ -247,6 +247,7 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
     .reduce((acc, p) => acc + p.pendingAmount, 0);
 
   const lowStockMaterials = db.rawMaterials.filter(rm => {
+  const lowStockMaterialsList = db.rawMaterials.map(rm => {
     const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
     const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
     let totalUsed = 0;
@@ -259,20 +260,43 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
         }
       }
     });
-    const currentStock = totalPurchased - totalUsed;
-    return currentStock < rm.minStockLevel;
-  }).length;
+    const currentStock = Math.max(0, totalPurchased - totalUsed);
+    if (currentStock < rm.minStockLevel) {
+      return {
+        id: rm.id,
+        type: 'Raw Material',
+        name: rm.name,
+        currentStock: `${currentStock.toFixed(2)} ${rm.unit}`,
+        threshold: `${rm.minStockLevel} ${rm.unit}`,
+        actionUrl: '/admin/purchases',
+        actionText: 'Restock Ingredient'
+      };
+    }
+    return null;
+  }).filter(Boolean);
 
-  const lowStockProducts = db.products.filter(p => {
+  const lowStockProductsList = db.products.map(p => {
     const productBatches = db.batches.filter(b => b.productId === p.id);
     const totalProduced = productBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
     const productSales = db.sales.filter(s => s.productId === p.id);
     const totalSold = productSales.reduce((sum, s) => sum + s.quantityGiven, 0);
-    const currentStock = totalProduced - totalSold;
-    return currentStock < 20;
-  }).length;
+    const currentStock = Math.max(0, totalProduced - totalSold);
+    if (currentStock < 20) {
+      return {
+        id: p.id,
+        type: 'Finished Product Pouch',
+        name: p.name,
+        currentStock: `${currentStock} packs`,
+        threshold: `20 packs`,
+        actionUrl: '/admin/production',
+        actionText: 'Log Production Batch'
+      };
+    }
+    return null;
+  }).filter(Boolean);
 
-  const lowStockAlerts = lowStockMaterials + lowStockProducts;
+  const lowStockItemsList = [...lowStockMaterialsList, ...lowStockProductsList];
+  const lowStockAlerts = lowStockItemsList.length;
 
   // 4. CHART TREND DATA
   const { range, startDate, endDate } = req.query;
@@ -407,6 +431,7 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
       },
       currentInventory,
       lowStockAlerts,
+      lowStockItemsList,
       pendingPayments
     },
     charts: {

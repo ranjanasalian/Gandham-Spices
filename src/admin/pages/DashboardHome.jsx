@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import {
   TrendingUp, TrendingDown, DollarSign, Package, AlertTriangle, Users,
-  ShoppingBag, Calendar, ArrowRight, RefreshCw, BarChart2, ShieldAlert, ClipboardList, Store, Archive
+  ShoppingBag, Calendar, ArrowRight, RefreshCw, BarChart2, ShieldAlert, ClipboardList, Store, Archive, X
 } from 'lucide-react';
 
 export default function DashboardHome({ isDarkMode }) {
+  const navigate = useNavigate();
   const [range, setRange] = useState('month');
+  const [showLowStockModal, setShowLowStockModal] = useState(false);
   const [startDate, setStartDate] = useState('2026-07-14');
   const [endDate, setEndDate] = useState('2026-07-20');
   const [stats, setStats] = useState(null);
@@ -461,18 +464,49 @@ export default function DashboardHome({ isDarkMode }) {
         </div>
       )}
 
+      {/* ---------------- LOW STOCK ALERT BANNER ---------------- */}
+      {summary.lowStockAlerts > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-semibold text-left animate-fade-in">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-500 animate-pulse" />
+            <div>
+              <p className="font-bold text-sm text-slate-800 dark:text-white">
+                {summary.lowStockAlerts} Low Stock Warnings Detected
+              </p>
+              <p className="mt-0.5 text-slate-600 dark:text-slate-400">
+                Some raw ingredient stocks or finished pouch inventories are below safe threshold levels.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowLowStockModal(true)}
+            className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl transition-all shadow-sm flex-shrink-0 text-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>View All {summary.lowStockAlerts} Warnings</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* ---------------- SUMMARY METRIC CARDS ---------------- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
         {cards.map((card, idx) => {
           const Icon = card.icon;
+          const isLowStockCard = card.title.includes('Low Stock');
           return (
             <div
               key={idx}
-              className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex items-center justify-between shadow-sm hover:shadow-md transition-all group`}
+              onClick={() => {
+                if (isLowStockCard) setShowLowStockModal(true);
+              }}
+              className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex items-center justify-between shadow-sm hover:shadow-md transition-all group ${
+                isLowStockCard ? 'cursor-pointer hover:border-red-500/50' : ''
+              }`}
             >
               <div className="space-y-1.5 text-left">
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
-                  {card.title}
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors flex items-center gap-1">
+                  <span>{card.title}</span>
+                  {isLowStockCard && <span className="text-[10px] text-red-500 font-bold">(Click to view)</span>}
                 </p>
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">{card.value}</span>
@@ -562,6 +596,75 @@ export default function DashboardHome({ isDarkMode }) {
         </div>
 
       </div>
+
+      {/* ---------------- LOW STOCK BREAKDOWN MODAL ---------------- */}
+      {showLowStockModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-6 text-left relative">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-red-500/10 text-red-500">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">Low Stock Inventory Warnings</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Items below minimum safety thresholds ({summary.lowStockAlerts || 0} items)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLowStockModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+              {(summary.lowStockItemsList && summary.lowStockItemsList.length > 0) ? (
+                summary.lowStockItemsList.map((item, idx) => (
+                  <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 p-3.5 rounded-2xl flex items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          item.type.includes('Raw') ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
+                        }`}>
+                          {item.type}
+                        </span>
+                        <span className="font-bold text-sm text-slate-800 dark:text-white">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs">
+                        <span className="text-red-500 font-bold">Current Stock: {item.currentStock}</span>
+                        <span className="text-slate-400">Min Threshold: {item.threshold}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowLowStockModal(false);
+                        navigate(item.actionUrl);
+                      }}
+                      className="px-3 py-1.5 bg-saffron hover:bg-orange-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1 shadow-sm flex-shrink-0 cursor-pointer"
+                    >
+                      <span>{item.actionText}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-xs">All inventory stock levels are healthy!</div>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setShowLowStockModal(false)}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
+              >
+                Close Window
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
