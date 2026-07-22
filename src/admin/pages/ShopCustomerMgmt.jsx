@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Store, Plus, Edit2, Trash2, AlertCircle, CheckCircle2, Phone, MapPin, RefreshCw, DollarSign, Clock, Users, Package } from 'lucide-react';
+import { Store, Plus, Edit2, Trash2, AlertCircle, CheckCircle2, Phone, MapPin, RefreshCw, Clock, Users, Package } from 'lucide-react';
 
 export default function ShopCustomerMgmt() {
   const [customers, setCustomers] = useState([]);
@@ -20,12 +20,10 @@ export default function ShopCustomerMgmt() {
   const [address, setAddress] = useState('');
   const [remarks, setRemarks] = useState('');
 
-  // Dues Collection Modal State
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [selectedShopForPayment, setSelectedShopForPayment] = useState(null);
-  const [collectionAmount, setCollectionAmount] = useState('');
-  const [collectionDate, setCollectionDate] = useState(new Date().toISOString().split('T')[0]);
-  const [collectionNotes, setCollectionNotes] = useState('');
+  // Delete Confirmation Modal State
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [deleteShopName, setDeleteShopName] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -102,55 +100,26 @@ export default function ShopCustomerMgmt() {
     }
   };
 
-  const handleCollectDuesClick = (c) => {
-    setSelectedShopForPayment(c);
-    setCollectionAmount('');
-    setCollectionDate(new Date().toISOString().split('T')[0]);
-    setCollectionNotes('');
-    setPaymentModalOpen(true);
+  const handleDeleteClick = (c) => {
+    setItemToDelete(c.id);
+    setDeleteShopName(c.shopName);
+    setDeleteConfirmOpen(true);
   };
 
-  const handlePaymentSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedShopForPayment) return;
-    setError('');
-    setSuccess('');
-
-    const amt = parseFloat(collectionAmount);
-    if (isNaN(amt) || amt <= 0) {
-      setError('Please enter a valid payment collection amount');
-      return;
-    }
-
-    try {
-      // Record payment towards sales entries
-      await api.request(`/admin/customers/${selectedShopForPayment.id}/payment`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amountPaid: amt,
-          paymentDate: collectionDate,
-          notes: collectionNotes
-        })
-      });
-
-      setSuccess(`Payment of ₹${amt.toFixed(2)} recorded for ${selectedShopForPayment.shopName}.`);
-      setPaymentModalOpen(false);
-      loadData();
-    } catch (err) {
-      setError(err.message || 'Failed to record payment collection');
-    }
-  };
-
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete "${name}" from the directory?`)) return;
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
     setError('');
     setSuccess('');
     try {
-      await api.customers.delete(id);
-      setSuccess('Shop profile removed from directory.');
+      await api.customers.delete(itemToDelete);
+      setSuccess(`Shop profile "${deleteShopName}" removed from directory.`);
       loadData();
     } catch (err) {
       setError('Failed to delete shop profile');
+    } finally {
+      setDeleteConfirmOpen(false);
+      setItemToDelete(null);
+      setDeleteShopName('');
     }
   };
 
@@ -195,7 +164,7 @@ export default function ShopCustomerMgmt() {
             <Store className="w-6 h-6 text-saffron" />
             <span>Shop & Customer Directory</span>
           </h3>
-          <p className="text-xs text-slate-500 mt-0.5">Manage outlet clients, contact information, and track account dues.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Manage outlet clients and contact information.</p>
         </div>
         <button
           onClick={handleAddNewClick}
@@ -367,75 +336,35 @@ export default function ShopCustomerMgmt() {
       </div>
       )}
 
-      {/* ---------------- COLLECT DUES PAYMENT MODAL ---------------- */}
-      {paymentModalOpen && selectedShopForPayment && (
+      {/* ---------------- CUSTOM CONFIRM DELETE OVERLAY MODAL ---------------- */}
+      {deleteConfirmOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-0" onClick={() => setPaymentModalOpen(false)} />
-          <div className="relative z-10 flex min-h-full w-full items-start justify-center p-4 text-center">
-            <div className="relative my-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-md text-left shadow-2xl animate-fade-in-up text-xs z-10 space-y-4">
-              <h3 className="text-base font-bold border-b pb-2 flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-500" />
-                <span>Collect Payment from {selectedShopForPayment.shopName}</span>
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-0" onClick={() => setDeleteConfirmOpen(false)} />
+          <div className="relative z-10 flex min-h-full w-full items-center justify-center p-4 text-center">
+            <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-sm text-left shadow-2xl animate-fade-in-up text-xs z-10 space-y-4">
+              <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                <span>Confirm Delete</span>
               </h3>
-
-              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl space-y-1">
-                <p className="text-slate-500 font-semibold">Contact: <span className="text-slate-800 dark:text-slate-200 font-bold">{selectedShopForPayment.contactName}</span></p>
-                <p className="text-slate-500 font-semibold">Current Outstanding Dues: <span className="text-red-500 font-black">₹{selectedShopForPayment.outstandingDues.toFixed(2)}</span></p>
+              <p className="text-slate-600 dark:text-slate-350 font-semibold leading-relaxed">
+                Are you sure you want to delete shop profile <span className="font-bold text-slate-800 dark:text-white">"{deleteShopName}"</span>?
+              </p>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmOpen(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-md transition-colors"
+                >
+                  Delete Profile
+                </button>
               </div>
-
-              <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                <div>
-                  <label htmlFor="collection-amt-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Amount Collected (₹) *</label>
-                  <input
-                    id="collection-amt-input"
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter amount collected"
-                    value={collectionAmount}
-                    onChange={(e) => setCollectionAmount(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-emerald-500 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="collection-date-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Payment Date *</label>
-                  <input
-                    id="collection-date-input"
-                    type="date"
-                    value={collectionDate}
-                    onChange={(e) => setCollectionDate(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="collection-notes-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1">Notes / Reference (Optional)</label>
-                  <input
-                    id="collection-notes-input"
-                    type="text"
-                    placeholder="e.g. Cash / UPI payment reference"
-                    value={collectionNotes}
-                    onChange={(e) => setCollectionNotes(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-3 border-t dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentModalOpen(false)}
-                    className="px-4 py-2 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 font-bold rounded-xl"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-md"
-                  >
-                    Record Payment
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
         </div>
@@ -443,7 +372,7 @@ export default function ShopCustomerMgmt() {
 
       {/* ---------------- SHOP DIRECTORY TABLE ---------------- */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm overflow-hidden">
-        <h4 className="font-bold text-sm mb-4 text-slate-750 dark:text-slate-300">Registered Shop Outlets & Dues Directory</h4>
+        <h4 className="font-bold text-sm mb-4 text-slate-750 dark:text-slate-300">Registered Shop Outlets Directory</h4>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left border-collapse">
             <thead>
@@ -452,20 +381,18 @@ export default function ShopCustomerMgmt() {
                 <th className="py-3 px-3">Contact Person</th>
                 <th className="py-3 px-3">Phone Number</th>
                 <th className="py-3 px-3 text-center">Classification</th>
-                <th className="py-3 px-3 text-right">Outstanding Dues</th>
                 <th className="py-3 px-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {shopStats.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-10 text-slate-400">
+                  <td colSpan="5" className="text-center py-10 text-slate-400">
                     No shops registered yet. Click "Register New Shop / Outlet" to add client profiles.
                   </td>
                 </tr>
               ) : (
                 shopStats.map((c) => {
-                  const hasDues = c.outstandingDues > 0;
                   return (
                     <tr key={c.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">
                       <td className="py-3 px-3 font-black text-slate-800 dark:text-white">{c.shopName}</td>
@@ -484,17 +411,7 @@ export default function ShopCustomerMgmt() {
                           {c.customerClassification}
                         </span>
                       </td>
-                      <td className={`py-3 px-3 text-right font-black ${hasDues ? 'text-red-500' : 'text-emerald-500'}`}>
-                        {hasDues ? `₹${c.outstandingDues.toFixed(2)}` : 'Paid Up (₹0.00)'}
-                      </td>
                       <td className="py-3 px-3 text-center flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => handleCollectDuesClick(c)}
-                          className="p-1.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-xl transition-colors"
-                          title="Collect Dues Payment"
-                        >
-                          <DollarSign className="w-3.5 h-3.5" />
-                        </button>
                         <button
                           onClick={() => handleEditClick(c)}
                           className="p-1.5 text-slate-400 hover:text-saffron hover:bg-saffron/10 rounded-xl transition-colors"
@@ -503,7 +420,7 @@ export default function ShopCustomerMgmt() {
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDelete(c.id, c.shopName)}
+                          onClick={() => handleDeleteClick(c)}
                           className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
                           title="Delete Shop Profile"
                         >
