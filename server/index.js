@@ -826,7 +826,7 @@ const recalculateBatchStocks = (db) => {
     }
 
     const totalSold = sales
-      .filter(s => s.batchId === b.id || s.batchNumber === b.batchNumber)
+      .filter(s => (s.batchId && s.batchId === b.id) || (s.productId === b.productId && s.batchNumber === b.batchNumber))
       .reduce((sum, s) => sum + (s.quantityGiven || 0), 0);
 
     b.remainingStock = Math.max(0, produced - totalSold);
