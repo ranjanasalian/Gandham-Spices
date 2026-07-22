@@ -67,7 +67,19 @@ export default function DashboardHome({ isDarkMode }) {
       { title: 'Current Finished Stock', value: summary.currentInventory || 0, unit: 'packs', icon: Archive, color: 'text-orange-500 bg-orange-500/10' },
       { title: 'Low Stock Alerts', value: summary.lowStockAlerts || 0, unit: 'warnings', icon: AlertTriangle, color: summary.lowStockAlerts > 0 ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-slate-400 bg-slate-400/10' },
     ];
-  } else if (range === 'month' || range === 'year') {
+  } else if (range === 'year') {
+    const year = summary.thisYear || { revenue: 0, netProfit: 0, expenses: 0, ingredientPurchases: 0, productionQty: 0, pouchesSold: 0 };
+    cards = [
+      { title: 'Total Revenue (Year)', value: `₹${(year.revenue || 0).toFixed(2)}`, unit: '', icon: DollarSign, color: 'text-amber-500 bg-amber-500/10' },
+      { title: 'Net Profit (Year)', value: `₹${(year.netProfit || 0).toFixed(2)}`, unit: '', icon: TrendingUp, color: 'text-teal-500 bg-teal-500/10' },
+      { title: 'Total Expenses (Year)', value: `₹${(year.expenses || 0).toFixed(2)}`, unit: '', icon: TrendingDown, color: 'text-rose-500 bg-rose-500/10' },
+      { title: 'Ingredient Purchases (Year)', value: `₹${(year.ingredientPurchases || 0).toFixed(2)}`, unit: '', icon: ShoppingBag, color: 'text-indigo-500 bg-indigo-500/10' },
+      { title: 'Production Quantity (Year)', value: year.productionQty || 0, unit: 'packs', icon: Package, color: 'text-blue-500 bg-blue-500/10' },
+      { title: 'Pouches Sold (Year)', value: year.pouchesSold || 0, unit: 'packs', icon: ShoppingBag, color: 'text-emerald-500 bg-emerald-500/10' },
+      { title: 'Current Finished Stock', value: summary.currentInventory || 0, unit: 'packs', icon: Archive, color: 'text-orange-500 bg-orange-500/10' },
+      { title: 'Low Stock Alerts', value: summary.lowStockAlerts || 0, unit: 'warnings', icon: AlertTriangle, color: summary.lowStockAlerts > 0 ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-slate-400 bg-slate-400/10' },
+    ];
+  } else if (range === 'month') {
     const month = summary.thisMonth || { revenue: 0, netProfit: 0, expenses: 0, ingredientPurchases: 0, productionQty: 0, pouchesSold: 0 };
     cards = [
       { title: 'Total Revenue (Month)', value: `₹${(month.revenue || 0).toFixed(2)}`, unit: '', icon: DollarSign, color: 'text-amber-500 bg-amber-500/10' },

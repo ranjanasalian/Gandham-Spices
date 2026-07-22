@@ -161,7 +161,7 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
 
   // 3. THIS MONTH STATS
   const currentMonthStr = todayStr.substring(0, 7);
-  const isInMonth = (dateStr) => dateStr.startsWith(currentMonthStr);
+  const isInMonth = (dateStr) => dateStr && dateStr.startsWith(currentMonthStr);
 
   const monthSales = db.sales.filter(s => isInMonth(s.date));
   const monthCustomerSales = (db.customers || []).filter(c => isInMonth(c.date));
@@ -190,6 +190,38 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
   });
   const monthGrossProfit = monthRevenue - monthCostOfGoods;
   const monthNetProfit = monthGrossProfit - monthExpenseTotal;
+
+  // 3.1 THIS YEAR STATS
+  const currentYearStr = todayStr.substring(0, 4);
+  const isInYear = (dateStr) => dateStr && dateStr.startsWith(currentYearStr);
+
+  const yearSales = db.sales.filter(s => isInYear(s.date));
+  const yearCustomerSales = (db.customers || []).filter(c => isInYear(c.date));
+  const yearBatches = db.batches.filter(b => isInYear(b.manufacturingDate));
+  const yearExpenses = db.expenses.filter(e => isInYear(e.date));
+  const yearPurchases = (db.ingredientPurchases || []).filter(p => isInYear(p.purchaseDate));
+
+  const yearRevenue = yearSales.reduce((sum, s) => sum + s.totalAmountReceivable, 0) + 
+                      yearCustomerSales.reduce((sum, c) => sum + (c.totalAmountReceivable || 0), 0);
+  const yearExpenseTotal = yearExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const yearPurchaseTotal = yearPurchases.reduce((sum, p) => sum + p.totalCost, 0);
+  const yearProduced = yearBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
+  const yearSold = yearSales.reduce((sum, s) => sum + s.quantityGiven, 0) + 
+                   yearCustomerSales.reduce((sum, c) => sum + (c.quantityGiven || 0), 0);
+
+  let yearCostOfGoods = 0;
+  yearSales.forEach(s => {
+    const prod = db.products.find(p => p.id === s.productId);
+    const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+    yearCostOfGoods += s.quantityGiven * cost;
+  });
+  yearCustomerSales.forEach(c => {
+    const prod = db.products.find(p => p.id === c.productId);
+    const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+    yearCostOfGoods += (c.quantityGiven || 0) * cost;
+  });
+  const yearGrossProfit = yearRevenue - yearCostOfGoods;
+  const yearNetProfit = yearGrossProfit - yearExpenseTotal;
 
   // Inventory Totals
   const currentInventory = db.products.reduce((acc, p) => {
@@ -329,6 +361,14 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
         ingredientPurchases: monthPurchaseTotal, 
         productionQty: monthProduced, 
         pouchesSold: monthSold 
+      },
+      thisYear: {
+        revenue: yearRevenue,
+        netProfit: yearNetProfit,
+        expenses: yearExpenseTotal,
+        ingredientPurchases: yearPurchaseTotal,
+        productionQty: yearProduced,
+        pouchesSold: yearSold
       },
       currentInventory,
       lowStockAlerts,
