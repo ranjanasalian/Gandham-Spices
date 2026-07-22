@@ -2081,9 +2081,49 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
     }
   }
 
+  // ---------------- FINANCIAL SUMMARY FOR DATE RANGE ----------------
+  const isGeneralExp = (e) => e.category !== 'Raw Materials' && e.category !== 'Packaging' && e.category !== 'Production' && !e.id.startsWith('e_prod_');
+  const rangeSales = filterByDate(db.sales, 'date');
+  const rangeCustomerSales = filterByDate(db.customers || [], 'date');
+  const rangeExpenses = filterByDate(db.expenses || [], 'date').filter(isGeneralExp);
+
+  const rangeRevenue = rangeSales.reduce((acc, s) => acc + s.totalAmountReceivable, 0) +
+                       rangeCustomerSales.reduce((acc, c) => acc + (c.totalAmountReceivable || 0), 0);
+
+  let rangeCogs = 0;
+  rangeSales.forEach(s => {
+    const prod = db.products.find(p => p.id === s.productId);
+    const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+    rangeCogs += s.quantityGiven * cost;
+  });
+  rangeCustomerSales.forEach(c => {
+    const prod = db.products.find(p => p.id === c.productId);
+    const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+    rangeCogs += (c.quantityGiven || 0) * cost;
+  });
+
+  const rangeExpenseTotal = rangeExpenses.reduce((acc, e) => acc + e.amount, 0);
+  const rangeGrossProfit = rangeRevenue - rangeCogs;
+  const rangeNetProfit = rangeGrossProfit - rangeExpenseTotal;
+  const rangeProfitMargin = rangeRevenue > 0 ? ((rangeNetProfit / rangeRevenue) * 100).toFixed(1) : '0.0';
+
+  const financialMetrics = {
+    revenue: `₹${rangeRevenue.toFixed(2)}`,
+    cogs: `₹${rangeCogs.toFixed(2)}`,
+    netProfit: `₹${rangeNetProfit.toFixed(2)}`,
+    profitMargin: `${rangeProfitMargin}%`,
+    period: `${startDate} to ${endDate}`
+  };
+
   res.json({
     reportData,
-    summary,
+    summary: {
+      'Total Revenue (Period)': `₹${rangeRevenue.toFixed(2)}`,
+      'Net Profit (Period)': `₹${rangeNetProfit.toFixed(2)}`,
+      'Profit Margin (%)': `${rangeProfitMargin}%`,
+      ...summary
+    },
+    financialMetrics,
     title: `${type.toUpperCase().replace('-', ' ')} REPORT`,
     dateRange: `${startDate} to ${endDate}`
   });

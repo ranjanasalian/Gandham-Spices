@@ -26,21 +26,28 @@ export default function Reports({ isDarkMode }) {
   };
 
   const handleExportCSV = () => {
-    if (!reportData || reportData.reportData.length === 0) return;
+    if (!reportData || !reportData.reportData || reportData.reportData.length === 0) return;
     
     const rows = reportData.reportData;
     const headers = Object.keys(rows[0]);
-    
-    // Map headers and rows
-    const csvContent = [
+    const fin = reportData.financialMetrics || {};
+
+    const csvLines = [
+      `"GANDHAM SPICES FINANCIAL AUDIT REPORT"`,
+      `"Report Title","${reportData.title || ''}"`,
+      `"Date Scope Period","${reportData.dateRange || ''}"`,
+      `"Total Revenue (Period)","${fin.revenue || ''}"`,
+      `"Net Profit (Period)","${fin.netProfit || ''}"`,
+      `"Profit Margin (%)","${fin.profitMargin || ''}"`,
+      `""`,
       headers.join(','),
       ...rows.map(row => headers.map(header => {
         const cell = row[header] === undefined || row[header] === null ? '' : String(row[header]);
-        // escape double quotes
         return `"${cell.replace(/"/g, '""')}"`;
       }).join(','))
-    ].join('\r\n');
+    ];
 
+    const csvContent = csvLines.join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -212,6 +219,28 @@ export default function Reports({ isDarkMode }) {
                 <p className="text-[9px] text-slate-400">Report Gen Date: {new Date('2026-07-20').toLocaleString()}</p>
               </div>
             </div>
+
+            {/* Financial Scope Performance Box */}
+            {reportData.financialMetrics && (
+              <div className="bg-slate-100 p-3.5 rounded-xl border border-slate-300 grid grid-cols-4 gap-4 text-center">
+                <div>
+                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">Scope Revenue</span>
+                  <p className="text-sm font-black text-slate-900">{reportData.financialMetrics.revenue}</p>
+                </div>
+                <div>
+                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">Production Cost (COGS)</span>
+                  <p className="text-sm font-black text-slate-700">{reportData.financialMetrics.cogs}</p>
+                </div>
+                <div>
+                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">Net Profit (Scope)</span>
+                  <p className="text-sm font-black text-emerald-700">{reportData.financialMetrics.netProfit}</p>
+                </div>
+                <div>
+                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">Profit Margin %</span>
+                  <p className="text-sm font-black text-amber-700">{reportData.financialMetrics.profitMargin}</p>
+                </div>
+              </div>
+            )}
 
             {/* Aggregations summary cards */}
             <div className="grid grid-cols-4 gap-4">
