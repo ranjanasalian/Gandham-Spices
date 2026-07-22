@@ -1397,6 +1397,63 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
   res.status(201).json(newSale);
 });
 
+app.put('/api/admin/sales/:id', authenticateToken, async (req, res) => {
+  const db = getDB();
+  const index = db.sales.findIndex(s => s.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Sale record not found' });
+
+  const current = db.sales[index];
+  const { date, customerId, productId, batchId, quantityGiven, amountReceived, paymentStatus, paymentDate, remarks } = req.body;
+
+  const targetCustId = customerId || current.customerId;
+  const customer = db.customers.find(c => c.id === targetCustId);
+  const shopName = customer ? customer.shopName : current.shopName;
+
+  const prodId = productId || current.productId;
+  const product = db.products.find(p => p.id === prodId);
+  if (!product) return res.status(404).json({ message: 'Product not found' });
+
+  const targetBatchId = batchId || current.batchId;
+  const batch = db.batches.find(b => b.id === targetBatchId);
+  if (!batch) return res.status(404).json({ message: 'Production batch not found' });
+
+  const qty = parseInt(quantityGiven !== undefined ? quantityGiven : current.quantityGiven, 10) || 0;
+  const received = parseFloat(amountReceived !== undefined ? amountReceived : current.amountReceived) || 0;
+
+  const totalReceivable = qty * product.wholesalePrice;
+  const balance = totalReceivable - received;
+
+  if (customer) {
+    customer.outstandingBalance = Math.max(0, parseFloat((customer.outstandingBalance - current.balanceAmount + balance).toFixed(2)));
+  }
+
+  db.sales[index] = {
+    ...current,
+    date: date || current.date,
+    customerId: targetCustId,
+    shopName,
+    productId: prodId,
+    productName: product.name,
+    batchId: targetBatchId,
+    batchNumber: batch.batchNumber,
+    packSize: product.packSize,
+    quantityGiven: qty,
+    mrp: product.mrp,
+    wholesalePrice: product.wholesalePrice,
+    totalAmountReceivable: parseFloat(totalReceivable.toFixed(2)),
+    paymentStatus: paymentStatus || (balance <= 0 ? 'Paid' : 'Pending'),
+    amountReceived: received,
+    balanceAmount: parseFloat(balance.toFixed(2)),
+    paymentDate: paymentDate !== undefined ? paymentDate : current.paymentDate,
+    remarks: remarks !== undefined ? remarks : current.remarks
+  };
+
+  recalculateBatchStocks(db);
+
+  await commit();
+  res.json(db.sales[index]);
+});
+
 app.delete('/api/admin/sales/:id', authenticateToken, async (req, res) => {
   const db = getDB();
   const index = db.sales.findIndex(s => s.id === req.params.id);

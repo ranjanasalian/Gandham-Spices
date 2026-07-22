@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Receipt, Plus, Trash2, AlertCircle, CheckCircle2, DollarSign, RefreshCw, ShoppingCart, Loader } from 'lucide-react';
+import { Receipt, Plus, Trash2, Edit2, AlertCircle, CheckCircle2, DollarSign, RefreshCw, ShoppingCart, Loader, X } from 'lucide-react';
 
 export default function SalesMgmt() {
   const [sales, setSales] = useState([]);
@@ -11,6 +11,11 @@ export default function SalesMgmt() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [editId, setEditId] = useState(null);
+
+  // Custom Delete Overlay State
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
 
   // Flat Transaction Ledger Form State
   const [date, setDate] = useState('');
@@ -48,6 +53,33 @@ export default function SalesMgmt() {
     loadData();
   }, []);
 
+  const handleEditClick = (sale) => {
+    setEditId(sale.id);
+    setDate(sale.date || '');
+    setCustomerId(sale.customerId || '');
+    setProductId(sale.productId || '');
+    setBatchId(sale.batchId || '');
+    setQuantityGiven((sale.quantityGiven || 0).toString());
+    setAmountReceived((sale.amountReceived || 0).toString());
+    setPaymentStatus(sale.paymentStatus || 'Pending');
+    setPaymentDate(sale.paymentDate || '');
+    setRemarks(sale.remarks || '');
+    setError('');
+    setSuccess('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditId(null);
+    setProductId('');
+    setBatchId('');
+    setQuantityGiven('');
+    setAmountReceived('0');
+    setPaymentDate('');
+    setRemarks('');
+    setError('');
+    setSuccess('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -69,14 +101,14 @@ export default function SalesMgmt() {
       setError('Please select a Production Batch');
       return;
     }
-    if (!quantityGiven || parseInt(quantityGiven, 15) <= 0) {
+    if (!quantityGiven || parseInt(quantityGiven, 10) <= 0) {
       setError('Please provide a valid quantity given');
       return;
     }
 
     const qty = parseInt(quantityGiven, 10);
     const selectedBatch = batches.find(b => b.id === batchId);
-    if (selectedBatch && selectedBatch.remainingStock < qty) {
+    if (!editId && selectedBatch && selectedBatch.remainingStock < qty) {
       setError(`Requested quantity (${qty}) exceeds selected batch remaining stock (${selectedBatch.remainingStock})`);
       return;
     }
@@ -95,10 +127,16 @@ export default function SalesMgmt() {
         remarks
       };
 
-      await api.sales.create(salePayload);
-      setSuccess('Transaction recorded in sales ledger. Finished stock updated.');
+      if (editId) {
+        await api.sales.update(editId, salePayload);
+        setSuccess('Sales transaction updated. Inventory synced.');
+      } else {
+        await api.sales.create(salePayload);
+        setSuccess('Transaction recorded in sales ledger. Finished stock updated.');
+      }
       
       // Reset Form
+      setEditId(null);
       setProductId('');
       setBatchId('');
       setQuantityGiven('');
@@ -115,16 +153,24 @@ export default function SalesMgmt() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this sales transaction? This will reverse stock and outstanding dues.')) return;
+  const handleDeleteClick = (sale) => {
+    setItemToDelete(sale);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
     setError('');
     setSuccess('');
     try {
-      await api.sales.delete(id);
+      await api.sales.delete(itemToDelete.id);
       setSuccess('Transaction deleted from ledger.');
       loadData();
     } catch (err) {
       setError('Failed to delete sales record');
+    } finally {
+      setDeleteConfirmOpen(false);
+      setItemToDelete(null);
     }
   };
 
@@ -162,12 +208,24 @@ export default function SalesMgmt() {
       
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
         
-        {/* ---------------- RECORD SALES LEDGER FORM ---------------- */}
+        {/* ---------------- RECORD / EDIT SALES LEDGER FORM ---------------- */}
         <div className="lg:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm h-fit">
-          <h3 className="text-base font-bold flex items-center gap-2 mb-6 border-b pb-2">
-            <ShoppingCart className="w-5 h-5 text-saffron" />
-            <span>Record Sales Ledger Transaction</span>
-          </h3>
+          <div className="flex justify-between items-center mb-6 border-b pb-2">
+            <h3 className="text-base font-bold flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-saffron" />
+              <span>{editId ? 'Edit Sales Ledger Transaction' : 'Record Sales Ledger Transaction'}</span>
+            </h3>
+            {editId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Cancel Edit</span>
+              </button>
+            )}
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5 text-xs">
             {error && (
@@ -216,7 +274,10 @@ export default function SalesMgmt() {
                 <select
                   id="sales-product-select"
                   value={productId}
-                  onChange={(e) => setProductId(e.target.value)}
+                  onChange={(e) => {
+                    setProductId(e.target.value);
+                    setBatchId('');
+                  }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron"
                 >
                   <option value="">Select product item</option>
@@ -235,68 +296,73 @@ export default function SalesMgmt() {
                   disabled={!productId}
                 >
                   <option value="">Choose batch source</option>
-                  {batches.filter(b => b.productId === productId).map(b => (
-                    <option key={b.id} value={b.id}>{b.batchNumber} (Avail: {b.remainingStock} packs)</option>
-                  ))}
+                  {batches
+                    .filter(b => b.productId === productId)
+                    .map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.batchNumber} (Avail: {b.remainingStock} packs)
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="sales-quantity-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Quantity Given (packets) *</label>
+                <label htmlFor="sales-qty-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Quantity Given (packets) *</label>
                 <input
-                  id="sales-quantity-input"
+                  id="sales-qty-input"
                   type="number"
                   placeholder="Total units supplied"
                   value={quantityGiven}
                   onChange={(e) => setQuantityGiven(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron font-bold text-sm"
                 />
               </div>
               <div>
-                <label htmlFor="sales-received-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Amount Received (₹)</label>
+                <label htmlFor="sales-rcvd-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Amount Received (₹)</label>
                 <input
-                  id="sales-received-input"
+                  id="sales-rcvd-input"
                   type="number"
                   step="0.01"
-                  placeholder="Cash/UPI collected"
                   value={amountReceived}
                   onChange={(e) => setAmountReceived(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron font-bold text-sm"
                 />
               </div>
             </div>
 
-            {/* Read-Only pricing parameters */}
-            <div className="bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 p-4 rounded-3xl space-y-2 text-xs">
-              <div className="flex justify-between text-slate-500">
+            {/* Pricing Summary Box */}
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 p-4 rounded-2xl space-y-2 text-slate-400">
+              <div className="flex justify-between items-center text-[11px]">
                 <span>MRP Price:</span>
-                <span>₹{mrpVal} / pack</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">₹{mrpVal} / pack</span>
               </div>
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between items-center text-[11px]">
                 <span>Wholesale Trade Price:</span>
-                <span>₹{wholesaleVal} / pack</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">₹{wholesaleVal} / pack</span>
               </div>
-              <div className="flex justify-between text-slate-700 dark:text-slate-300 font-bold border-t dark:border-slate-800 pt-1.5">
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-2 flex justify-between items-center text-xs font-bold text-slate-800 dark:text-white">
                 <span>Total Amount Receivable:</span>
-                <span>₹{receivableVal.toFixed(2)}</span>
+                <span className="text-sm font-black text-saffron">₹{receivableVal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between items-center text-[11px]">
                 <span>Amount Paid Today:</span>
-                <span className="text-emerald-500 font-semibold">₹{receivedVal.toFixed(2)}</span>
+                <span className="font-bold text-emerald-500">₹{receivedVal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between font-black text-sm text-slate-800 dark:text-white border-t dark:border-slate-800 pt-2">
-                <span>Balance Dues (Outstanding):</span>
-                <span className={balanceVal > 0 ? 'text-red-500' : 'text-slate-500'}>₹{balanceVal.toFixed(2)}</span>
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-2 flex justify-between items-center text-xs font-bold">
+                <span className="text-slate-700 dark:text-slate-300">Balance Dues (Outstanding):</span>
+                <span className={balanceVal > 0 ? 'text-red-500 font-black' : 'text-slate-400'}>
+                  ₹{balanceVal.toFixed(2)}
+                </span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="payment-status-select" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Payment Status</label>
+                <label htmlFor="sales-status-select" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Payment Status</label>
                 <select
-                  id="payment-status-select"
+                  id="sales-status-select"
                   value={paymentStatus}
                   onChange={(e) => setPaymentStatus(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
@@ -330,23 +396,34 @@ export default function SalesMgmt() {
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full flex justify-center items-center gap-2 py-3 bg-gradient-to-r from-saffron to-orange-500 hover:from-orange-500 hover:to-terracotta text-white font-bold rounded-2xl shadow active:scale-[0.98] disabled:opacity-50"
-            >
-              {submitting ? (
-                <>
-                  <Loader className="w-4 h-4 animate-spin" />
-                  <span>Recording ledger entry...</span>
-                </>
-              ) : (
-                <>
-                  <Receipt className="w-4 h-4" />
-                  <span>Log Sales Ledger Transaction</span>
-                </>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 flex justify-center items-center gap-2 py-3 bg-gradient-to-r from-saffron to-orange-500 hover:from-orange-500 hover:to-terracotta text-white font-bold rounded-2xl shadow active:scale-[0.98] disabled:opacity-50 transition-all"
+              >
+                {submitting ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span>{editId ? 'Updating ledger entry...' : 'Recording ledger entry...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="w-4 h-4" />
+                    <span>{editId ? 'Save Changes' : 'Log Sales Ledger Transaction'}</span>
+                  </>
+                )}
+              </button>
+              {editId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-2xl transition-colors"
+                >
+                  Cancel
+                </button>
               )}
-            </button>
+            </div>
 
           </form>
         </div>
@@ -380,14 +457,24 @@ export default function SalesMgmt() {
                       </span>
                     </div>
                   </div>
-                  <div className="text-xs pt-1.5 border-t border-slate-100 dark:border-slate-800/50 flex justify-between text-slate-500 font-semibold">
+                  <div className="text-xs pt-1.5 border-t border-slate-100 dark:border-slate-800/50 flex justify-between items-center text-slate-500 font-semibold">
                     <span>{sale.productName} ({sale.quantityGiven} packs @ batch {sale.batchNumber})</span>
-                    <button
-                      onClick={() => handleDelete(sale.id)}
-                      className="text-slate-400 hover:text-red-500 hover:bg-red-500/10 p-1 rounded-lg"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleEditClick(sale)}
+                        className="text-slate-400 hover:text-saffron hover:bg-saffron/10 p-1 rounded-lg transition-colors"
+                        title="Edit Transaction"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(sale)}
+                        className="text-slate-400 hover:text-red-500 hover:bg-red-500/10 p-1 rounded-lg transition-colors"
+                        title="Delete Transaction"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   {sale.remarks && (
                     <div className="text-[10px] italic text-slate-400 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-lg mt-1 leading-normal">
@@ -401,6 +488,45 @@ export default function SalesMgmt() {
         </div>
 
       </div>
+
+      {/* ---------------- CUSTOM CONFIRM DELETE MODAL ---------------- */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-0" onClick={() => setDeleteConfirmOpen(false)} />
+          <div className="relative z-10 flex min-h-full w-full items-center justify-center p-4 text-center">
+            <div className="relative my-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-sm text-left shadow-2xl animate-fade-in-up text-xs z-10 space-y-4">
+              <div className="flex items-center gap-3 text-red-500">
+                <div className="p-3 bg-red-500/10 rounded-2xl">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-800 dark:text-white">Delete Sales Entry</h4>
+                  <p className="text-[11px] text-slate-400">Confirm transaction reversal</p>
+                </div>
+              </div>
+              
+              <p className="text-slate-500 leading-relaxed">
+                Are you sure you want to delete this sale for <strong className="text-slate-200">{itemToDelete?.shopName}</strong> ({itemToDelete?.quantityGiven} packs of {itemToDelete?.productName})? This will reverse stock deductions and shop dues.
+              </p>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  onClick={() => setDeleteConfirmOpen(false)}
+                  className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-md transition-colors"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
