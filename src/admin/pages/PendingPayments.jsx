@@ -268,54 +268,55 @@ export default function PendingPayments() {
                   const status = (pp.status || '').toLowerCase();
                   return custName.includes(term) || inv.includes(term) || dueDate.includes(term) || status.includes(term);
                 }).map((pp) => {
-                const cust = customers.find(c => c.id === pp.customerId);
-                const overdue = pp.status === 'Pending' && isOverdue(pp.dueDate);
-                return (
-                  <tr
-                    key={pp.id}
-                    className={`border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors ${
-                      overdue ? 'bg-red-500/5 dark:bg-red-500/5' : ''
-                    }`}
-                  >
-                    <td className="py-3 px-2 font-bold text-saffron">{pp.invoiceNumber}</td>
-                    <td className="py-3 px-2 font-semibold text-slate-800 dark:text-white">{cust ? cust.shopName : 'Direct Customer'}</td>
-                    <td className="py-3 px-2 text-right font-bold">₹{pp.totalAmount}</td>
-                    <td className="py-3 px-2 text-right font-medium text-emerald-500">₹{pp.amountPaid}</td>
-                    <td className={`py-3 px-2 text-right font-black ${pp.pendingAmount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
-                      ₹{pp.pendingAmount}
-                    </td>
-                    <td className="py-3 px-2 text-center font-mono font-semibold">
-                      <span className="flex items-center justify-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{pp.dueDate}</span>
-                      </span>
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
-                        pp.status === 'Paid'
-                          ? 'bg-emerald-500/10 text-emerald-500'
-                          : overdue
-                            ? 'bg-red-500/10 text-red-500 animate-pulse'
-                            : 'bg-yellow-500/10 text-yellow-600'
-                      }`}>
-                        {pp.status === 'Paid' ? 'Paid' : overdue ? 'OVERDUE' : 'Pending'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      {pp.status === 'Pending' ? (
-                        <button
-                          onClick={() => handlePayClick(pp)}
-                          className="px-3 py-1 bg-saffron hover:bg-orange-500 text-white font-bold text-[10px] rounded-lg transition-colors"
-                        >
-                          Collect
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 dark:text-slate-400 font-semibold">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                  const cust = customers.find(c => c.id === pp.customerId);
+                  const overdue = pp.status === 'Pending' && isOverdue(pp.dueDate);
+                  return (
+                    <tr
+                      key={pp.id}
+                      className={`border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors ${
+                        overdue ? 'bg-red-500/5 dark:bg-red-500/5' : ''
+                      }`}
+                    >
+                      <td className="py-3 px-2 font-bold text-saffron">{pp.invoiceNumber}</td>
+                      <td className="py-3 px-2 font-semibold text-slate-800 dark:text-white">{cust ? cust.shopName : 'Direct Customer'}</td>
+                      <td className="py-3 px-2 text-right font-bold">₹{pp.totalAmount}</td>
+                      <td className="py-3 px-2 text-right font-medium text-emerald-500">₹{pp.amountPaid}</td>
+                      <td className={`py-3 px-2 text-right font-black ${pp.pendingAmount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                        ₹{pp.pendingAmount}
+                      </td>
+                      <td className="py-3 px-2 text-center font-mono font-semibold">
+                        <span className="flex items-center justify-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{pp.dueDate}</span>
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
+                          pp.status === 'Paid'
+                            ? 'bg-emerald-500/10 text-emerald-500'
+                            : overdue
+                              ? 'bg-red-500/10 text-red-500 animate-pulse'
+                              : 'bg-yellow-500/10 text-yellow-600'
+                        }`}>
+                          {pp.status === 'Paid' ? 'Paid' : overdue ? 'OVERDUE' : 'Pending'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        {pp.status === 'Pending' ? (
+                          <button
+                            onClick={() => handlePayClick(pp)}
+                            className="px-3 py-1 bg-saffron hover:bg-orange-500 text-white font-bold text-[10px] rounded-lg transition-colors"
+                          >
+                            Collect
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-400 font-semibold">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
