@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 export default function DashboardHome({ isDarkMode }) {
-  const [range, setRange] = useState('week');
+  const [range, setRange] = useState('month');
   const [startDate, setStartDate] = useState('2026-07-14');
   const [endDate, setEndDate] = useState('2026-07-20');
   const [stats, setStats] = useState(null);
