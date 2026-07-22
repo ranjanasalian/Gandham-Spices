@@ -740,9 +740,24 @@ app.delete('/api/admin/recipes/:id', authenticateToken, async (req, res) => {
 });
 
 
+const recalculateBatchStocks = (db) => {
+  if (!db || !db.batches) return;
+  const sales = db.sales || [];
+  db.batches.forEach(b => {
+    const totalSold = sales
+      .filter(s => s.batchId === b.id || s.batchNumber === b.batchNumber)
+      .reduce((sum, s) => sum + (s.quantityGiven || 0), 0);
+    const produced = parseInt(b.packetsProduced || 0, 10);
+    b.remainingStock = Math.max(0, produced - totalSold);
+  });
+};
+
 // ---------------- BATCHES (PRODUCTION) CRUD & TRACEABILITY ----------------
-app.get('/api/admin/batches', authenticateToken, (req, res) => {
-  res.json(getDB().batches);
+app.get('/api/admin/batches', authenticateToken, async (req, res) => {
+  const db = getDB();
+  recalculateBatchStocks(db);
+  await commit();
+  res.json(db.batches);
 });
 
 // Create Batch: auto-deduct raw materials & add finished product stock
@@ -1220,6 +1235,9 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
     return res.status(400).json({ message: 'Missing required sales fields' });
   }
 
+  // Recalculate batch stocks dynamically from sales before checking
+  recalculateBatchStocks(db);
+
   const customer = db.customers.find(c => c.id === customerId);
   const shopName = customer ? customer.shopName : 'Direct Shop';
 
@@ -1264,8 +1282,8 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
 
   db.sales.push(newSale);
 
-  // Deduct remaining stock in batch
-  batch.remainingStock -= qty;
+  // Recalculate remaining stock for all batches
+  recalculateBatchStocks(db);
 
   // Track customer outstanding dues
   if (customer) {
@@ -1304,10 +1322,7 @@ app.delete('/api/admin/sales/:id', authenticateToken, async (req, res) => {
 
   const deleted = db.sales.splice(index, 1)[0];
 
-  const batch = db.batches.find(b => b.id === deleted.batchId);
-  if (batch) {
-    batch.remainingStock += deleted.quantityGiven;
-  }
+  recalculateBatchStocks(db);
 
   const customer = db.customers.find(c => c.id === deleted.customerId);
   if (customer) {
