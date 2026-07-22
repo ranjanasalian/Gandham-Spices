@@ -410,8 +410,9 @@ export default function DeliveryMgmt() {
                     </td>
                   </tr>
                 );
-              })}
-            </tbody>
+              })
+            )}
+          </tbody>
           </table>
         </div>
       </div>

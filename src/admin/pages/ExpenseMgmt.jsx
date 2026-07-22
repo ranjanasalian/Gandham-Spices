@@ -287,25 +287,26 @@ export default function ExpenseMgmt() {
                     const date = (e.date || '').toLowerCase();
                     return cat.includes(term) || desc.includes(term) || date.includes(term);
                   }).map((e) => (
-                  <tr key={e.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">
-                    <td className="py-3 px-2 font-semibold">{e.date}</td>
-                    <td className="py-3 px-2">
-                      <span className="bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-lg font-bold text-[10px] uppercase text-slate-500">
-                        {e.category}
-                      </span>
-                    </td>
-                    <td className="py-3 px-2 font-medium max-w-[200px] truncate" title={e.description}>{e.description}</td>
-                    <td className="py-3 px-2 text-right font-black text-slate-800 dark:text-white">₹{e.amount}</td>
-                    <td className="py-3 px-2 text-center">
-                      <button
-                        onClick={() => handleDelete(e.id)}
-                        className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-500/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                    <tr key={e.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">
+                      <td className="py-3 px-2 font-semibold">{e.date}</td>
+                      <td className="py-3 px-2">
+                        <span className="bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-lg font-bold text-[10px] uppercase text-slate-500">
+                          {e.category}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 font-medium max-w-[200px] truncate" title={e.description}>{e.description}</td>
+                      <td className="py-3 px-2 text-right font-black text-slate-800 dark:text-white">₹{e.amount}</td>
+                      <td className="py-3 px-2 text-center">
+                        <button
+                          onClick={() => handleDelete(e.id)}
+                          className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-500/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

@@ -171,7 +171,6 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
 
   const monthRevenue = monthSales.reduce((sum, s) => sum + s.totalAmountReceivable, 0) + 
                        monthCustomerSales.reduce((sum, c) => sum + (c.totalAmountReceivable || 0), 0);
-  const monthExpenseTotal = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
   const monthPurchaseTotal = monthPurchases.reduce((sum, p) => sum + p.totalCost, 0);
   const monthProduced = monthBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
   const monthSold = monthSales.reduce((sum, s) => sum + s.quantityGiven, 0) + 
