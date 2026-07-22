@@ -189,10 +189,10 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
     monthCostOfGoods += (c.quantityGiven || 0) * cost;
   });
   
-  // Overhead expenses excluding Raw Materials and Packaging (which are already in Production Cost per pouch)
-  const monthOverheadExpenses = monthExpenses
-    .filter(e => e.category !== 'Raw Materials' && e.category !== 'Packaging')
-    .reduce((sum, e) => sum + e.amount, 0);
+  const isGeneralExpense = (e) => e.category !== 'Raw Materials' && e.category !== 'Packaging' && e.category !== 'Production' && !e.id.startsWith('e_prod_');
+
+  const monthOverheadExpenses = monthExpenses.filter(isGeneralExpense).reduce((sum, e) => sum + e.amount, 0);
+  const monthExpenseTotal = monthExpenses.filter(isGeneralExpense).reduce((sum, e) => sum + e.amount, 0);
 
   const monthGrossProfit = monthRevenue - monthCostOfGoods;
   const monthNetProfit = monthGrossProfit - monthOverheadExpenses;
@@ -209,7 +209,7 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
 
   const yearRevenue = yearSales.reduce((sum, s) => sum + s.totalAmountReceivable, 0) + 
                       yearCustomerSales.reduce((sum, c) => sum + (c.totalAmountReceivable || 0), 0);
-  const yearExpenseTotal = yearExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const yearExpenseTotal = yearExpenses.filter(isGeneralExpense).reduce((sum, e) => sum + e.amount, 0);
   const yearPurchaseTotal = yearPurchases.reduce((sum, p) => sum + p.totalCost, 0);
   const yearProduced = yearBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
   const yearSold = yearSales.reduce((sum, s) => sum + s.quantityGiven, 0) + 
@@ -227,9 +227,7 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
     yearCostOfGoods += (c.quantityGiven || 0) * cost;
   });
 
-  const yearOverheadExpenses = yearExpenses
-    .filter(e => e.category !== 'Raw Materials' && e.category !== 'Packaging')
-    .reduce((sum, e) => sum + e.amount, 0);
+  const yearOverheadExpenses = yearExpenses.filter(isGeneralExpense).reduce((sum, e) => sum + e.amount, 0);
 
   const yearGrossProfit = yearRevenue - yearCostOfGoods;
   const yearNetProfit = yearGrossProfit - yearOverheadExpenses;
@@ -967,19 +965,10 @@ app.post('/api/admin/batches', authenticateToken, async (req, res) => {
 
   db.batches.push(newBatch);
 
-  // Auto-log expense
-  db.expenses.push({
-    id: `e_prod_${newBatch.id}`,
-    category: 'Production',
-    amount: mfgCost,
-    date: manufacturingDate,
-    description: `Production cost for batch ${newBatch.batchNumber} (${packetsCount} pouches of ${product.name})`
-  });
-
   db.recentActivities.unshift({
     id: `a_${Date.now()}`,
-    action: 'Recorded Production Batch',
-    details: `Created batch ${newBatch.batchNumber} (${packetsCount} packs of ${product.name}). Deducted ingredients.`,
+    action: 'Logged Production Batch',
+    details: `Produced ${packetsCount} pouches of ${product.name} (Batch #${newBatch.batchNumber})`,
     timestamp: new Date().toISOString()
   });
 
@@ -1539,7 +1528,9 @@ app.delete('/api/admin/sales/:id', authenticateToken, async (req, res) => {
 
 // ---------------- EXPENSES CRUD ----------------
 app.get('/api/admin/expenses', authenticateToken, (req, res) => {
-  res.json(getDB().expenses);
+  const db = getDB();
+  const filtered = (db.expenses || []).filter(e => e.category !== 'Production' && !e.id.startsWith('e_prod_'));
+  res.json(filtered);
 });
 
 app.post('/api/admin/expenses', authenticateToken, async (req, res) => {
