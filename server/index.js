@@ -246,7 +246,6 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
     .filter(p => p.status === 'Pending')
     .reduce((acc, p) => acc + p.pendingAmount, 0);
 
-  const lowStockMaterials = db.rawMaterials.filter(rm => {
   const lowStockMaterialsList = db.rawMaterials.map(rm => {
     const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
     const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);

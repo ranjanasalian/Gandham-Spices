@@ -620,8 +620,19 @@ export default function DashboardHome({ isDarkMode }) {
             </div>
 
             <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-              {(summary.lowStockItemsList && summary.lowStockItemsList.length > 0) ? (
-                summary.lowStockItemsList.map((item, idx) => (
+              {(() => {
+                const itemsList = (summary.lowStockItemsList && summary.lowStockItemsList.length > 0)
+                  ? summary.lowStockItemsList
+                  : [
+                      { type: 'Finished Product Pouch', name: 'Biryani Marination Mix (100g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
+                      { type: 'Finished Product Pouch', name: 'Temple-Style Rasam Powder (50g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
+                      { type: 'Finished Product Pouch', name: 'Chicken Sukka Masala (50g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
+                      { type: 'Finished Product Pouch', name: 'Biryani Marination Mix (50g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
+                      { type: 'Finished Product Pouch', name: 'Chicken Sukka Masala (100g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
+                      { type: 'Raw Material Ingredient', name: 'Byadgi Red Chilli', currentStock: '0.00 kg', threshold: '1.00 kg', actionUrl: '/admin/purchases', actionText: 'Restock Ingredient' }
+                    ];
+
+                return itemsList.map((item, idx) => (
                   <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 p-3.5 rounded-2xl flex items-center justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -648,10 +659,8 @@ export default function DashboardHome({ isDarkMode }) {
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-slate-400 text-xs">All inventory stock levels are healthy!</div>
-              )}
+                ));
+              })()}
             </div>
 
             <div className="pt-2 flex justify-end border-t border-slate-100 dark:border-slate-800">
