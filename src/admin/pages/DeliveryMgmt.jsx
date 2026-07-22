@@ -177,7 +177,7 @@ export default function DeliveryMgmt() {
                 >
                   <option value="">Select client outlet</option>
                   {customers.map(c => (
-                    <option key={c.id} value={c.id}>{c.shopName} ({c.customerType})</option>
+                    <option key={c.id} value={c.id}>{c.shopName}{c.contactName ? ` (${c.contactName})` : ''}</option>
                   ))}
                 </select>
               </div>

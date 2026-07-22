@@ -204,7 +204,7 @@ export default function SalesMgmt() {
                 >
                   <option value="">Select buyer shop</option>
                   {customers.map(c => (
-                    <option key={c.id} value={c.id}>{c.shopName} ({c.customerType})</option>
+                    <option key={c.id} value={c.id}>{c.shopName}{c.contactName ? ` (${c.contactName})` : ''}</option>
                   ))}
                 </select>
               </div>
