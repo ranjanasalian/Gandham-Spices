@@ -740,14 +740,35 @@ app.delete('/api/admin/recipes/:id', authenticateToken, async (req, res) => {
 });
 
 
+const parsePouchGrams = (sizeStr) => {
+  if (!sizeStr) return 100;
+  const clean = sizeStr.toLowerCase().replace(/\s+/g, '');
+  const num = parseFloat(clean);
+  if (isNaN(num)) return 100;
+  if (clean.endsWith('kg')) return num * 1000;
+  return num;
+};
+
 const recalculateBatchStocks = (db) => {
   if (!db || !db.batches) return;
   const sales = db.sales || [];
   db.batches.forEach(b => {
+    let produced = parseInt(b.packetsProduced || 0, 10);
+    const weightKg = parseFloat(b.quantityProduced || 0);
+    const pouchGrams = parsePouchGrams(b.packSize);
+
+    if (weightKg > 0 && pouchGrams > 0) {
+      const estimated = Math.floor((weightKg * 1000) / pouchGrams);
+      if ((produced <= 1 || isNaN(produced)) && estimated > 0) {
+        produced = estimated;
+        b.packetsProduced = estimated;
+      }
+    }
+
     const totalSold = sales
       .filter(s => s.batchId === b.id || s.batchNumber === b.batchNumber)
       .reduce((sum, s) => sum + (s.quantityGiven || 0), 0);
-    const produced = parseInt(b.packetsProduced || 0, 10);
+
     b.remainingStock = Math.max(0, produced - totalSold);
   });
 };
@@ -1023,6 +1044,7 @@ app.put('/api/admin/batches/:id', authenticateToken, async (req, res) => {
     });
   }
 
+  recalculateBatchStocks(db);
   await commit();
   res.json(updated);
 });
