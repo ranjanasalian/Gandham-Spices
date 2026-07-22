@@ -448,22 +448,18 @@ export default function ShopCustomerMgmt() {
           <table className="w-full text-xs text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase tracking-wider">
-                <th className="py-3 px-2">Shop / Outlet</th>
-                <th className="py-3 px-2">Contact Person</th>
-                <th className="py-3 px-2">Classification</th>
-                <th className="py-3 px-2">Phone Number</th>
-                <th className="py-3 px-2">Address</th>
-                <th className="py-3 px-2 text-center">Pouches Bought</th>
-                <th className="py-3 px-2 text-right">Total Purchases</th>
-                <th className="py-3 px-2 text-right">Outstanding Dues</th>
-                <th className="py-3 px-2 text-center">Status</th>
-                <th className="py-3 px-2 text-center">Actions</th>
+                <th className="py-3 px-3">Shop / Outlet</th>
+                <th className="py-3 px-3">Contact Person</th>
+                <th className="py-3 px-3">Phone Number</th>
+                <th className="py-3 px-3 text-center">Classification</th>
+                <th className="py-3 px-3 text-right">Outstanding Dues</th>
+                <th className="py-3 px-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {shopStats.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="text-center py-10 text-slate-400">
+                  <td colSpan="6" className="text-center py-10 text-slate-400">
                     No shops registered yet. Click "Register New Shop / Outlet" to add client profiles.
                   </td>
                 </tr>
@@ -472,9 +468,10 @@ export default function ShopCustomerMgmt() {
                   const hasDues = c.outstandingDues > 0;
                   return (
                     <tr key={c.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">
-                      <td className="py-3 px-2 font-black text-slate-800 dark:text-white">{c.shopName}</td>
-                      <td className="py-3 px-2 font-semibold text-slate-600 dark:text-slate-350">{c.contactName}</td>
-                      <td className="py-3 px-2">
+                      <td className="py-3 px-3 font-black text-slate-800 dark:text-white">{c.shopName}</td>
+                      <td className="py-3 px-3 font-semibold text-slate-600 dark:text-slate-350">{c.contactName}</td>
+                      <td className="py-3 px-3 text-slate-500 font-medium">{c.phoneNumber || '—'}</td>
+                      <td className="py-3 px-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full font-bold text-[9px] ${
                           c.customerClassification === 'Wholesaler'
                             ? 'bg-purple-500/10 text-purple-500'
@@ -487,21 +484,10 @@ export default function ShopCustomerMgmt() {
                           {c.customerClassification}
                         </span>
                       </td>
-                      <td className="py-3 px-2 text-slate-500">{c.phoneNumber || '—'}</td>
-                      <td className="py-3 px-2 text-slate-500 max-w-[150px] truncate">{c.address || '—'}</td>
-                      <td className="py-3 px-2 text-center font-bold text-slate-700 dark:text-slate-300">{c.totalPouches} packs</td>
-                      <td className="py-3 px-2 text-right font-bold text-slate-800 dark:text-white">₹{c.totalReceivables.toFixed(2)}</td>
-                      <td className={`py-3 px-2 text-right font-black ${hasDues ? 'text-red-500' : 'text-slate-400'}`}>
-                        ₹{c.outstandingDues.toFixed(2)}
+                      <td className={`py-3 px-3 text-right font-black ${hasDues ? 'text-red-500' : 'text-emerald-500'}`}>
+                        {hasDues ? `₹${c.outstandingDues.toFixed(2)}` : 'Paid Up (₹0.00)'}
                       </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                          !hasDues ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'
-                        }`}>
-                          {!hasDues ? 'Paid Up' : 'Dues Pending'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-2 text-center flex items-center justify-center gap-1">
+                      <td className="py-3 px-3 text-center flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => handleCollectDuesClick(c)}
                           className="p-1.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-xl transition-colors"
