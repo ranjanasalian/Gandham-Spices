@@ -163,15 +163,39 @@ export default function Reports({ isDarkMode }) {
             </div>
           </div>
 
-          {/* Aggregations cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(reportData.summary).map(([key, val]) => (
-              <div key={key} className="p-3 bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-800 rounded-xl space-y-1">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{key}</span>
-                <p className="text-sm font-black text-slate-800 dark:text-white">{val}</p>
+          {/* Financial Scope Performance Box */}
+          {reportData.financialMetrics && (
+            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+              <div>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Scope Revenue</span>
+                <p className="text-base font-black text-slate-800 dark:text-white mt-0.5">{reportData.financialMetrics.revenue}</p>
               </div>
-            ))}
-          </div>
+              <div>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Production Cost (COGS)</span>
+                <p className="text-base font-black text-slate-600 dark:text-slate-300 mt-0.5">{reportData.financialMetrics.cogs}</p>
+              </div>
+              <div>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Net Profit (Scope)</span>
+                <p className="text-base font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{reportData.financialMetrics.netProfit}</p>
+              </div>
+              <div>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Profit Margin %</span>
+                <p className="text-base font-black text-amber-500 mt-0.5">{reportData.financialMetrics.profitMargin}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Aggregations cards */}
+          {Object.keys(reportData.summary || {}).length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(reportData.summary).map(([key, val]) => (
+                <div key={key} className="p-3 bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-800 rounded-xl space-y-1">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{key}</span>
+                  <p className="text-sm font-black text-slate-800 dark:text-white">{val}</p>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Grid Preview Table */}
           <div className="overflow-x-auto">

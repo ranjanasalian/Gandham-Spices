@@ -1874,7 +1874,6 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
       const totalRev = filteredSales.reduce((acc, s) => acc + s.totalAmountReceivable, 0);
       summary = {
         'Total Transactions': filteredSales.length,
-        'Gross Revenue': `₹${totalRev}`,
         'Average Transaction Value': filteredSales.length > 0 ? `₹${(totalRev / filteredSales.length).toFixed(2)}` : '₹0.00'
       };
       break;
@@ -1892,7 +1891,6 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
         'Revenue Generated': `₹${total}`
       }));
       summary = {
-        'Total Revenue': `₹${filteredSales.reduce((acc, s) => acc + s.totalAmountReceivable, 0)}`,
         'Active Sales Records': filteredSales.length
       };
       break;
@@ -1925,9 +1923,7 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
 
       const totalExp = filteredExpenses.reduce((acc, e) => acc + e.amount, 0);
       summary = {
-        'Gross Margin': `₹${grossProfit}`,
-        'Operating Expenses': `₹${totalExp}`,
-        'Net Operating Profit': `₹${Math.max(0, grossProfit - totalExp)}`
+        'Operating Expenses': `₹${totalExp}`
       };
       break;
     }
@@ -2117,12 +2113,7 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
 
   res.json({
     reportData,
-    summary: {
-      'Total Revenue (Period)': `₹${rangeRevenue.toFixed(2)}`,
-      'Net Profit (Period)': `₹${rangeNetProfit.toFixed(2)}`,
-      'Profit Margin (%)': `${rangeProfitMargin}%`,
-      ...summary
-    },
+    summary,
     financialMetrics,
     title: `${type.toUpperCase().replace('-', ' ')} REPORT`,
     dateRange: `${startDate} to ${endDate}`
