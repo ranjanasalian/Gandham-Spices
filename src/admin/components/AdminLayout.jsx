@@ -3,7 +3,7 @@ import { api } from '../api';
 import {
   LayoutDashboard, ClipboardList, Factory, FlaskConical, Search, Archive, Package,
   Store, Truck, Receipt, Wallet, CircleDollarSign, ArrowRightLeft, Users, Target,
-  FileBarChart, LogOut, Bell, Sun, Moon, Menu, X, ShieldAlert, ShoppingBag
+  FileBarChart, LogOut, Bell, Sun, Moon, Menu, X, ShieldAlert, ShoppingBag, FileText
 } from 'lucide-react';
 
 export default function AdminLayout({ user, currentTab, setCurrentTab, children, isDarkMode, setIsDarkMode }) {
@@ -63,6 +63,7 @@ export default function AdminLayout({ user, currentTab, setCurrentTab, children,
     { id: 'customers', label: 'Shop & Customer Mgmt', icon: Store },
     { id: 'deliveries', label: 'Delivery Management', icon: Truck },
     { id: 'sales', label: 'Sales Management', icon: Receipt },
+    { id: 'invoices', label: 'Bill & Invoice Generator', icon: FileText },
     { id: 'expenses', label: 'Expense Management', icon: Wallet },
     { id: 'payments', label: 'Pending Payments', icon: CircleDollarSign },
     { id: 'orders', label: 'Order Management', icon: ArrowRightLeft },

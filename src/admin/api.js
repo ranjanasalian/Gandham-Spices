@@ -197,6 +197,10 @@ export const api = {
       method: 'DELETE'
     })
   },
+  invoices: {
+    getAll: () => request('/admin/invoices'),
+    getByNumber: (invoiceNumber) => request(`/admin/invoices/${invoiceNumber}`)
+  },
   expenses: {
     getAll: () => request('/admin/expenses'),
     create: (expense) => request('/admin/expenses', {

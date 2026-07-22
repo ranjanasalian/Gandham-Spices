@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Receipt, Plus, Trash2, Edit2, AlertCircle, CheckCircle2, DollarSign, RefreshCw, ShoppingCart, Loader, X, Search } from 'lucide-react';
+import { Receipt, Plus, Trash2, Edit2, AlertCircle, CheckCircle2, DollarSign, RefreshCw, ShoppingCart, Loader, X, Search, FileText } from 'lucide-react';
+import InvoiceModal from '../components/InvoiceModal';
 
 export default function SalesMgmt() {
   const [sales, setSales] = useState([]);
@@ -13,6 +14,7 @@ export default function SalesMgmt() {
   const [success, setSuccess] = useState('');
   const [editId, setEditId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   // Custom Delete Overlay State
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -204,8 +206,56 @@ export default function SalesMgmt() {
     );
   }
 
+  const handleViewInvoice = (sale) => {
+    const cust = customers.find(c => c.id === sale.customerId) || { shopName: sale.shopName || 'Retail Customer' };
+    
+    const sameInvoiceSales = sales.filter(s => 
+      (s.invoiceNumber && s.invoiceNumber === sale.invoiceNumber) ||
+      (s.customerId === sale.customerId && s.date === sale.date)
+    );
+
+    const items = (sameInvoiceSales.length > 0 ? sameInvoiceSales : [sale]).map(s => ({
+      saleId: s.id,
+      productId: s.productId,
+      productName: s.productName,
+      packSize: s.packSize,
+      batchId: s.batchId,
+      batchNumber: s.batchNumber,
+      quantityGiven: s.quantityGiven,
+      mrp: s.mrp,
+      wholesalePrice: s.wholesalePrice,
+      totalAmount: s.totalAmountReceivable
+    }));
+
+    const subtotal = items.reduce((acc, i) => acc + i.totalAmount, 0);
+    const amountReceived = sameInvoiceSales.reduce((acc, s) => acc + (s.amountReceived || 0), 0);
+    const balanceAmount = Math.max(0, subtotal - amountReceived);
+
+    const invObj = {
+      invoiceNumber: sale.invoiceNumber || `INV-${sale.id.slice(-6).toUpperCase()}`,
+      date: sale.date,
+      customerId: sale.customerId,
+      shopName: sale.shopName,
+      customer: cust,
+      items,
+      subtotal,
+      amountReceived,
+      balanceAmount,
+      paymentStatus: balanceAmount <= 0 ? 'Paid' : 'Pending',
+      remarks: sale.remarks || ''
+    };
+    setSelectedInvoice(invObj);
+  };
+
   return (
     <div className="space-y-8 font-body text-left">
+      {/* Invoice Modal Render */}
+      {selectedInvoice && (
+        <InvoiceModal
+          invoice={selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+        />
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
         
@@ -500,6 +550,14 @@ export default function SalesMgmt() {
                   <div className="text-xs pt-1.5 border-t border-slate-100 dark:border-slate-800/50 flex justify-between items-center text-slate-500 font-semibold">
                     <span>{sale.productName} ({sale.quantityGiven} packs @ batch {sale.batchNumber})</span>
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleViewInvoice(sale)}
+                        className="flex items-center gap-1 text-[11px] font-bold text-saffron bg-saffron/10 hover:bg-saffron hover:text-white px-2 py-1 rounded-lg transition-all"
+                        title="Generate / View Tax Invoice"
+                      >
+                        <FileText className="w-3 h-3" />
+                        <span>Bill</span>
+                      </button>
                       <button
                         onClick={() => handleEditClick(sale)}
                         className="text-slate-400 hover:text-saffron hover:bg-saffron/10 p-1 rounded-lg transition-colors"

@@ -16,6 +16,7 @@ import ProductMgmt from './pages/ProductMgmt';
 import ShopCustomerMgmt from './pages/ShopCustomerMgmt';
 import DeliveryMgmt from './pages/DeliveryMgmt';
 import SalesMgmt from './pages/SalesMgmt';
+import Invoices from './pages/Invoices';
 import ExpenseMgmt from './pages/ExpenseMgmt';
 import PendingPayments from './pages/PendingPayments';
 import OrderMgmt from './pages/OrderMgmt';
@@ -102,6 +103,8 @@ export default function AdminApp() {
         return <DeliveryMgmt />;
       case 'sales':
         return <SalesMgmt />;
+      case 'invoices':
+        return <Invoices />;
       case 'expenses':
         return <ExpenseMgmt />;
       case 'payments':

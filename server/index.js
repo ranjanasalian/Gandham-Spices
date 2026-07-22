@@ -1474,8 +1474,13 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
   const totalReceivable = qty * product.wholesalePrice;
   const balance = totalReceivable - received;
 
+  const yearStr = new Date().getFullYear();
+  const salesCount = (db.sales || []).length + 1;
+  const generatedInvNo = req.body.invoiceNumber || `INV-${yearStr}-${String(salesCount).padStart(4, '0')}`;
+
   const newSale = {
     id: `s_${Date.now()}`,
+    invoiceNumber: generatedInvNo,
     date,
     customerId,
     shopName,
@@ -1510,7 +1515,7 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
     db.pendingPayments.push({
       id: `pp_${Date.now()}`,
       customerId,
-      invoiceNumber: newSale.id,
+      invoiceNumber: newSale.invoiceNumber,
       totalAmount: totalReceivable,
       amountPaid: received,
       pendingAmount: balance,
@@ -1522,12 +1527,68 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
   db.recentActivities.unshift({
     id: `a_${Date.now()}`,
     action: 'Recorded Sale Ledger',
-    details: `Supplied ${qty} packs of ${product.name} to ${shopName}. Receivable: ₹${totalReceivable.toFixed(2)}.`,
+    details: `Supplied ${qty} packs of ${product.name} to ${shopName}. Invoice: ${generatedInvNo}.`,
     timestamp: new Date().toISOString()
   });
 
   await commit();
   res.status(201).json(newSale);
+});
+
+// ---------------- INVOICES ROUTE ----------------
+app.get('/api/admin/invoices', authenticateToken, (req, res) => {
+  const db = getDB();
+  const sales = db.sales || [];
+  
+  const groups = {};
+  sales.forEach(s => {
+    const invNo = s.invoiceNumber || `INV-${s.id.replace('s_', '').slice(-6).toUpperCase()}`;
+    if (!groups[invNo]) {
+      const cust = db.customers.find(c => c.id === s.customerId);
+      groups[invNo] = {
+        invoiceNumber: invNo,
+        date: s.date,
+        customerId: s.customerId,
+        shopName: s.shopName,
+        customer: cust || { shopName: s.shopName || 'Direct Shop', ownerName: '', address: '', phoneNumber: '' },
+        items: [],
+        subtotal: 0,
+        amountReceived: 0,
+        balanceAmount: 0,
+        paymentStatus: 'Paid',
+        remarks: s.remarks || ''
+      };
+    }
+    
+    groups[invNo].items.push({
+      saleId: s.id,
+      productId: s.productId,
+      productName: s.productName,
+      packSize: s.packSize,
+      batchId: s.batchId,
+      batchNumber: s.batchNumber,
+      quantityGiven: s.quantityGiven,
+      mrp: s.mrp,
+      wholesalePrice: s.wholesalePrice,
+      totalAmount: s.totalAmountReceivable
+    });
+
+    groups[invNo].subtotal += s.totalAmountReceivable || 0;
+    groups[invNo].amountReceived += s.amountReceived || 0;
+    groups[invNo].balanceAmount += s.balanceAmount || 0;
+    if (s.remarks && !groups[invNo].remarks) groups[invNo].remarks = s.remarks;
+  });
+
+  const invoiceList = Object.values(groups).map(inv => {
+    inv.subtotal = parseFloat(inv.subtotal.toFixed(2));
+    inv.amountReceived = parseFloat(inv.amountReceived.toFixed(2));
+    inv.balanceAmount = Math.max(0, parseFloat((inv.subtotal - inv.amountReceived).toFixed(2)));
+    inv.paymentStatus = inv.balanceAmount <= 0 ? 'Paid' : (inv.amountReceived > 0 ? 'Partially Paid' : 'Pending');
+    return inv;
+  });
+
+  invoiceList.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  res.json(invoiceList);
 });
 
 app.put('/api/admin/sales/:id', authenticateToken, async (req, res) => {
