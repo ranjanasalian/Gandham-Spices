@@ -940,9 +940,15 @@ app.post('/api/admin/batches', authenticateToken, async (req, res) => {
 app.get('/api/admin/batches/trace/:batchNumber', authenticateToken, (req, res) => {
   const { batchNumber } = req.params;
   const db = getDB();
+  const query = batchNumber.trim().toLowerCase();
 
-  const batch = db.batches.find(b => b.batchNumber.toLowerCase() === batchNumber.trim().toLowerCase());
-  if (!batch) return res.status(404).json({ message: `Batch ${batchNumber} not found.` });
+  const batch = db.batches.find(b => 
+    (b.batchNumber && b.batchNumber.toLowerCase() === query) ||
+    (b.batchCode && b.batchCode.toLowerCase() === query) ||
+    (b.id && b.id.toLowerCase() === query)
+  );
+
+  if (!batch) return res.status(404).json({ message: `Batch "${batchNumber}" not found.` });
 
   const product = db.products.find(p => p.id === batch.productId);
   const recipe = db.recipes.find(r => r.id === batch.recipeId);
@@ -952,45 +958,43 @@ app.get('/api/admin/batches/trace/:batchNumber', authenticateToken, (req, res) =
     const rm = db.rawMaterials.find(m => m.id === ing.rawMaterialId);
     return {
       name: rm ? rm.name : 'Unknown Material',
-      quantityTotal: (ing.quantity * batch.packetsProduced).toFixed(2),
+      quantityTotal: (ing.quantity * (batch.packetsProduced || 0)).toFixed(2),
       unit: rm ? rm.unit : ''
     };
   }) : [];
 
-  // Track deliveries containing this batch
-  const matchedDeliveries = db.deliveries.filter(d => d.batchNumber === batch.batchNumber || d.batchId === batch.id);
-  const shopsSupplied = Array.from(new Set(matchedDeliveries.map(d => {
-    const cust = db.customers.find(c => c.id === d.customerId);
-    return cust ? cust.shopName : 'Direct Customer';
+  // Match sales in db.sales
+  const matchedSales = (db.sales || []).filter(s => 
+    s.batchId === batch.id || 
+    (s.productId === batch.productId && s.batchNumber === batch.batchNumber)
+  );
+
+  const shopsSupplied = Array.from(new Set(matchedSales.map(s => {
+    const cust = db.customers.find(c => c.id === s.customerId);
+    return cust ? cust.shopName : (s.shopName || 'Direct Customer');
   })));
 
-  // Track sales containing this batch
-  const salesHistory = [];
   let totalRevenueGenerated = 0;
   let totalProfitGenerated = 0;
+  const costPerPack = batch.costPerPacket || (product ? product.costPrice : 0) || 0;
 
-  db.sales.forEach(sale => {
-    const batchItems = sale.items.filter(item => item.batchId === batch.id || item.batchNumber === batch.batchNumber);
-    if (batchItems.length > 0) {
-      const cust = db.customers.find(c => c.id === sale.customerId);
-      const qtySold = batchItems.reduce((acc, item) => acc + item.quantity, 0);
-      const rev = batchItems.reduce((acc, item) => acc + item.totalAmount, 0);
-      
-      const costOfItem = product ? product.costPrice : 0;
-      const profit = batchItems.reduce((acc, item) => acc + (item.sellingPrice - costOfItem) * item.quantity, 0);
+  const salesHistory = matchedSales.map(s => {
+    const cust = db.customers.find(c => c.id === s.customerId);
+    const qty = s.quantityGiven || 0;
+    const rev = s.totalAmountReceivable || 0;
+    const profit = parseFloat((rev - (qty * costPerPack)).toFixed(2));
 
-      totalRevenueGenerated += rev;
-      totalProfitGenerated += profit;
+    totalRevenueGenerated += rev;
+    totalProfitGenerated += profit;
 
-      salesHistory.push({
-        invoiceNumber: sale.invoiceNumber,
-        date: sale.date,
-        customerName: cust ? cust.shopName : 'Direct Customer',
-        quantity: qtySold,
-        revenue: rev,
-        profit: profit
-      });
-    }
+    return {
+      invoiceNumber: s.id,
+      date: s.date,
+      customerName: cust ? cust.shopName : (s.shopName || 'Direct Customer'),
+      quantity: qty,
+      revenue: rev,
+      profit: profit
+    };
   });
 
   res.json({
@@ -1001,9 +1005,9 @@ app.get('/api/admin/batches/trace/:batchNumber', authenticateToken, (req, res) =
     shopsSupplied,
     salesHistory,
     financials: {
-      revenueGenerated: totalRevenueGenerated,
-      profitGenerated: Math.max(0, totalProfitGenerated),
-      remainingStockValue: batch.remainingStock * batch.costPerPacket
+      revenueGenerated: parseFloat(totalRevenueGenerated.toFixed(2)),
+      profitGenerated: Math.max(0, parseFloat(totalProfitGenerated.toFixed(2))),
+      remainingStockValue: parseFloat(((batch.remainingStock || 0) * (batch.costPerPacket || 0)).toFixed(2))
     }
   });
 });

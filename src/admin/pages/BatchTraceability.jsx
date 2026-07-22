@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Search, Calendar, DollarSign, Package, AlertTriangle, FileSpreadsheet, Store, Eye, RefreshCw } from 'lucide-react';
 
@@ -7,6 +7,13 @@ export default function BatchTraceability() {
   const [traceData, setTraceData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [availableBatches, setAvailableBatches] = useState([]);
+
+  useEffect(() => {
+    api.batches.getAll()
+      .then(data => setAvailableBatches(data || []))
+      .catch(() => {});
+  }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -19,7 +26,7 @@ export default function BatchTraceability() {
       const data = await api.batches.trace(query.trim());
       setTraceData(data);
     } catch (err) {
-      setError(err.message || 'Batch not found. Try BM01, RP01, or CS01');
+      setError(err.message || 'Batch not found.');
     } finally {
       setLoading(false);
     }
@@ -48,7 +55,7 @@ export default function BatchTraceability() {
         <div className="max-w-xl mx-auto space-y-2">
           <h2 className="text-2xl font-black tracking-tight text-slate-800 dark:text-white">Batch Traceability Tracker</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Enter a production batch number to audit its ingredients, manufacturing details, sales, and retail ledger.
+            Enter or select a production batch number to audit its ingredients, manufacturing details, sales, and retail ledger.
           </p>
         </div>
 
@@ -63,7 +70,7 @@ export default function BatchTraceability() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-saffron/50 focus:border-saffron text-sm text-center font-black uppercase tracking-wider"
-              placeholder="e.g. BM01, RP01, CS01"
+              placeholder="e.g. Batch 1, RP01, BM01"
             />
           </div>
           <button
@@ -75,17 +82,25 @@ export default function BatchTraceability() {
           </button>
         </form>
 
-        <div className="flex justify-center items-center gap-2 text-xs">
-          <span className="text-slate-400 font-semibold">Quick Demos:</span>
-          {['BM01', 'RP01', 'CS01'].map((num) => (
-            <button
-              key={num}
-              onClick={() => handleExampleClick(num)}
-              className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-saffron hover:text-white dark:hover:bg-saffron rounded-lg font-black transition-all text-saffron text-[10px]"
-            >
-              {num}
-            </button>
-          ))}
+        <div className="flex flex-wrap justify-center items-center gap-2 text-xs pt-1">
+          <span className="text-slate-400 font-semibold">Select Active Batch:</span>
+          {availableBatches.length === 0 ? (
+            <span className="text-slate-500 italic text-[11px]">No production batches registered yet</span>
+          ) : (
+            availableBatches.map((b) => {
+              const label = b.batchNumber || b.batchCode || b.id;
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => handleExampleClick(label)}
+                  className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-saffron hover:text-white dark:hover:bg-saffron rounded-lg font-black transition-all text-saffron text-[10px]"
+                >
+                  {label}
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
 
