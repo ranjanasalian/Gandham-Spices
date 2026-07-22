@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Factory, Calendar, DollarSign, Package, AlertCircle, Plus, CheckCircle2, Loader, RefreshCw, Trash2, Edit2 } from 'lucide-react';
+import { Factory, Calendar, DollarSign, Package, AlertCircle, Plus, CheckCircle2, Loader, RefreshCw, Trash2, Edit2, Search, X } from 'lucide-react';
 
 export default function ProductionMgmt() {
   const [batches, setBatches] = useState([]);
@@ -10,6 +10,7 @@ export default function ProductionMgmt() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Form & Editing States
   const [editId, setEditId] = useState(null);
@@ -492,10 +493,27 @@ export default function ProductionMgmt() {
 
         {/* ---------------- PRODUCTION HISTORY LOG ---------------- */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col min-h-[450px] overflow-hidden max-w-full">
-          <h3 className="text-lg font-bold flex items-center gap-2 mb-6 border-b border-slate-100 dark:border-slate-800 pb-3 text-left">
-            <Package className="w-5 h-5 text-saffron" />
-            <span>Complete Production History</span>
-          </h3>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 border-b border-slate-100 dark:border-slate-800 pb-3 text-left">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <Package className="w-5 h-5 text-saffron" />
+              <span>Complete Production History</span>
+            </h3>
+            <div className="relative w-full sm:w-60">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search batches..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 pl-8 pr-8 py-1.5 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-saffron"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
 
           <div className="w-full max-w-full overflow-x-auto max-h-[400px] overflow-y-auto flex-1">
             <table className="w-full text-xs text-left border-collapse">
@@ -517,8 +535,30 @@ export default function ProductionMgmt() {
                   <tr>
                     <td colSpan="9" className="py-10 text-center text-slate-400">No production batches recorded yet.</td>
                   </tr>
+                ) : batches.filter(batch => {
+                    if (!searchTerm.trim()) return true;
+                    const term = searchTerm.toLowerCase();
+                    const prod = products.find(p => p.id === batch.productId);
+                    const prodName = prod ? prod.name.toLowerCase() : '';
+                    const bNum = (batch.batchNumber || '').toLowerCase();
+                    const bCode = (batch.batchCode || '').toLowerCase();
+                    const date = (batch.manufacturingDate || '').toLowerCase();
+                    return prodName.includes(term) || bNum.includes(term) || bCode.includes(term) || date.includes(term);
+                  }).length === 0 ? (
+                  <tr>
+                    <td colSpan="9" className="py-10 text-center text-slate-400">No records match your search criteria.</td>
+                  </tr>
                 ) : (
-                  batches.map((batch) => {
+                  batches.filter(batch => {
+                    if (!searchTerm.trim()) return true;
+                    const term = searchTerm.toLowerCase();
+                    const prod = products.find(p => p.id === batch.productId);
+                    const prodName = prod ? prod.name.toLowerCase() : '';
+                    const bNum = (batch.batchNumber || '').toLowerCase();
+                    const bCode = (batch.batchCode || '').toLowerCase();
+                    const date = (batch.manufacturingDate || '').toLowerCase();
+                    return prodName.includes(term) || bNum.includes(term) || bCode.includes(term) || date.includes(term);
+                  }).map((batch) => {
                     const prod = products.find(p => p.id === batch.productId);
                     return (
                       <tr key={batch.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { ShoppingBag, Plus, AlertCircle, CheckCircle2, RefreshCw, Trash2, Edit2 } from 'lucide-react';
+import { ShoppingBag, Plus, AlertCircle, CheckCircle2, RefreshCw, Trash2, Edit2, Search, X } from 'lucide-react';
 
 export default function PurchaseHistory() {
   const [purchases, setPurchases] = useState([]);
@@ -8,6 +8,7 @@ export default function PurchaseHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Form & Editing States
   const [editId, setEditId] = useState(null);
@@ -304,10 +305,27 @@ export default function PurchaseHistory() {
 
         {/* ---------------- PURCHASE HISTORY LEDGER TABLE ---------------- */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col h-full min-h-[400px]">
-          <h3 className="text-base font-bold flex items-center gap-2 mb-6 border-b pb-2">
-            <ShoppingBag className="w-5 h-5 text-saffron" />
-            <span>Purchased Spices Ledger</span>
-          </h3>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 border-b pb-3">
+            <h3 className="text-base font-bold flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-saffron" />
+              <span>Purchased Spices Ledger</span>
+            </h3>
+            <div className="relative w-full sm:w-60">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search history..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 pl-8 pr-8 py-1.5 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-saffron"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
 
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-xs text-left border-collapse">
@@ -328,8 +346,32 @@ export default function PurchaseHistory() {
                       No spice purchases logged. Enter data to start stock inventory.
                     </td>
                   </tr>
+                ) : purchases.filter(p => {
+                    if (!searchTerm.trim()) return true;
+                    const term = searchTerm.toLowerCase();
+                    const rm = rawMaterials.find(m => m.id === p.rawMaterialId);
+                    const ingName = rm ? rm.name.toLowerCase() : '';
+                    const supplier = (p.supplierName || '').toLowerCase();
+                    const notes = (p.notes || '').toLowerCase();
+                    const date = (p.purchaseDate || '').toLowerCase();
+                    return ingName.includes(term) || supplier.includes(term) || notes.includes(term) || date.includes(term);
+                  }).length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-10 text-slate-400">
+                      No records match your search criteria.
+                    </td>
+                  </tr>
                 ) : (
-                  purchases.map((p) => {
+                  purchases.filter(p => {
+                    if (!searchTerm.trim()) return true;
+                    const term = searchTerm.toLowerCase();
+                    const rm = rawMaterials.find(m => m.id === p.rawMaterialId);
+                    const ingName = rm ? rm.name.toLowerCase() : '';
+                    const supplier = (p.supplierName || '').toLowerCase();
+                    const notes = (p.notes || '').toLowerCase();
+                    const date = (p.purchaseDate || '').toLowerCase();
+                    return ingName.includes(term) || supplier.includes(term) || notes.includes(term) || date.includes(term);
+                  }).map((p) => {
                     const rm = rawMaterials.find(m => m.id === p.rawMaterialId);
                     return (
                       <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">

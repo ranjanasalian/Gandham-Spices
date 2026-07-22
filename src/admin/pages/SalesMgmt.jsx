@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Receipt, Plus, Trash2, Edit2, AlertCircle, CheckCircle2, DollarSign, RefreshCw, ShoppingCart, Loader, X } from 'lucide-react';
+import { Receipt, Plus, Trash2, Edit2, AlertCircle, CheckCircle2, DollarSign, RefreshCw, ShoppingCart, Loader, X, Search } from 'lucide-react';
 
 export default function SalesMgmt() {
   const [sales, setSales] = useState([]);
@@ -12,6 +12,7 @@ export default function SalesMgmt() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [editId, setEditId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Custom Delete Overlay State
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -430,18 +431,57 @@ export default function SalesMgmt() {
 
         {/* ---------------- LEDGER FEED (COL 2) ---------------- */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col h-full min-h-[450px]">
-          <h3 className="text-base font-bold flex items-center gap-2 mb-6 border-b pb-2">
-            <Receipt className="w-5 h-5 text-saffron" />
-            <span>Sales & Inventory Ledger Feed</span>
-          </h3>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 border-b pb-3">
+            <h3 className="text-base font-bold flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-saffron" />
+              <span>Sales & Inventory Ledger Feed</span>
+            </h3>
+            <div className="relative w-full sm:w-52">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search sales..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 pl-8 pr-8 py-1.5 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-saffron"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
 
           <div className="overflow-y-auto flex-1 text-left space-y-3.5 pr-1">
             {sales.length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 No ledger transactions recorded yet.
               </div>
+            ) : sales.filter(s => {
+                if (!searchTerm.trim()) return true;
+                const term = searchTerm.toLowerCase();
+                const shop = (s.shopName || '').toLowerCase();
+                const prod = (s.productName || '').toLowerCase();
+                const batch = (s.batchNumber || '').toLowerCase();
+                const date = (s.date || '').toLowerCase();
+                const notes = (s.remarks || '').toLowerCase();
+                return shop.includes(term) || prod.includes(term) || batch.includes(term) || date.includes(term) || notes.includes(term);
+              }).length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                No sales match your search criteria.
+              </div>
             ) : (
-              sales.map((sale) => (
+              sales.filter(s => {
+                if (!searchTerm.trim()) return true;
+                const term = searchTerm.toLowerCase();
+                const shop = (s.shopName || '').toLowerCase();
+                const prod = (s.productName || '').toLowerCase();
+                const batch = (s.batchNumber || '').toLowerCase();
+                const date = (s.date || '').toLowerCase();
+                const notes = (s.remarks || '').toLowerCase();
+                return shop.includes(term) || prod.includes(term) || batch.includes(term) || date.includes(term) || notes.includes(term);
+              }).map((sale) => (
                 <div key={sale.id} className="border border-slate-100 dark:border-slate-800 p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/20 space-y-2">
                   <div className="flex justify-between items-center">
                     <div>

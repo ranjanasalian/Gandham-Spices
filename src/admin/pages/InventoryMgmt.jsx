@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Archive, Plus, AlertCircle, CheckCircle2, RefreshCw, Trash2, Edit2 } from 'lucide-react';
+import { Archive, Plus, AlertCircle, CheckCircle2, RefreshCw, Trash2, Edit2, Search, X } from 'lucide-react';
 
 export default function InventoryMgmt() {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Form & Editing States
   const [editId, setEditId] = useState(null);
@@ -234,20 +235,37 @@ export default function InventoryMgmt() {
 
         {/* ---------------- STOCK GRID LIST ---------------- */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col h-full min-h-[400px]">
-          <div className="flex justify-between items-center mb-6 border-b pb-2">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 border-b pb-3">
             <h3 className="text-base font-bold flex items-center gap-2">
               <Archive className="w-5 h-5 text-saffron" />
               <span>Raw Materials Inventory Registry</span>
             </h3>
-            {selectedIds.length > 0 && (
-              <button
-                onClick={triggerBulkDelete}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-500 hover:bg-red-600 text-white font-bold text-[10px] rounded-lg shadow-sm transition-all animate-fade-in"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Selected ({selectedIds.length})</span>
-              </button>
-            )}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-56">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search materials..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 pl-8 pr-8 py-1.5 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-saffron"
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={triggerBulkDelete}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-500 hover:bg-red-600 text-white font-bold text-[10px] rounded-lg shadow-sm transition-all animate-fade-in whitespace-nowrap"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Selected ({selectedIds.length})</span>
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="overflow-x-auto flex-1">
@@ -284,8 +302,22 @@ export default function InventoryMgmt() {
                       No raw materials registered. Add items above to start.
                     </td>
                   </tr>
+                ) : materials.filter(m => {
+                    if (!searchTerm.trim()) return true;
+                    const term = searchTerm.toLowerCase();
+                    return m.name.toLowerCase().includes(term) || m.unit.toLowerCase().includes(term);
+                  }).length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="text-center py-10 text-slate-400">
+                      No records match your search criteria.
+                    </td>
+                  </tr>
                 ) : (
-                  materials.map((m) => {
+                  materials.filter(m => {
+                    if (!searchTerm.trim()) return true;
+                    const term = searchTerm.toLowerCase();
+                    return m.name.toLowerCase().includes(term) || m.unit.toLowerCase().includes(term);
+                  }).map((m) => {
                     const isLow = m.currentStock < m.minStockLevel;
                     return (
                       <tr key={m.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Store, Plus, Edit2, Trash2, AlertCircle, CheckCircle2, Phone, MapPin, RefreshCw, Clock, Users, Package } from 'lucide-react';
+import { Store, Plus, Edit2, Trash2, AlertCircle, CheckCircle2, Phone, MapPin, RefreshCw, Clock, Users, Package, Search, X } from 'lucide-react';
 
 export default function ShopCustomerMgmt() {
   const [customers, setCustomers] = useState([]);
@@ -8,6 +8,7 @@ export default function ShopCustomerMgmt() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Shop Profile Modal State
   const [editorOpen, setEditorOpen] = useState(false);
@@ -372,8 +373,26 @@ export default function ShopCustomerMgmt() {
       )}
 
       {/* ---------------- SHOP DIRECTORY TABLE ---------------- */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm overflow-hidden">
-        <h4 className="font-bold text-sm mb-4 text-slate-750 dark:text-slate-300">Registered Shop Outlets Directory</h4>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm overflow-hidden space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
+          <h4 className="font-bold text-sm text-slate-750 dark:text-slate-300">Registered Shop Outlets Directory</h4>
+          <div className="relative w-full sm:w-60">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search directory..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 pl-8 pr-8 py-1.5 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-saffron"
+            />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left border-collapse">
             <thead>
@@ -392,8 +411,30 @@ export default function ShopCustomerMgmt() {
                     No shops registered yet. Click "Register New Shop / Outlet" to add client profiles.
                   </td>
                 </tr>
+              ) : shopStats.filter(c => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  const shop = (c.shopName || '').toLowerCase();
+                  const contact = (c.contactName || '').toLowerCase();
+                  const phone = (c.phoneNumber || '').toLowerCase();
+                  const classif = (c.customerClassification || '').toLowerCase();
+                  return shop.includes(term) || contact.includes(term) || phone.includes(term) || classif.includes(term);
+                }).length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center py-10 text-slate-400">
+                    No records match your search criteria.
+                  </td>
+                </tr>
               ) : (
-                shopStats.map((c) => {
+                shopStats.filter(c => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  const shop = (c.shopName || '').toLowerCase();
+                  const contact = (c.contactName || '').toLowerCase();
+                  const phone = (c.phoneNumber || '').toLowerCase();
+                  const classif = (c.customerClassification || '').toLowerCase();
+                  return shop.includes(term) || contact.includes(term) || phone.includes(term) || classif.includes(term);
+                }).map((c) => {
                   return (
                     <tr key={c.id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-100/5 transition-colors">
                       <td className="py-3 px-3 font-black text-slate-800 dark:text-white">{c.shopName}</td>

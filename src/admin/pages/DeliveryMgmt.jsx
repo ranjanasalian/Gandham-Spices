@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Truck, Plus, AlertCircle, CheckCircle2, RefreshCw, Clock, ArrowRight } from 'lucide-react';
+import { Truck, Plus, AlertCircle, CheckCircle2, RefreshCw, Clock, ArrowRight, Search, X } from 'lucide-react';
 
 export default function DeliveryMgmt() {
   const [deliveries, setDeliveries] = useState([]);
@@ -10,6 +10,7 @@ export default function DeliveryMgmt() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Form State
   const [editorOpen, setEditorOpen] = useState(false);
@@ -302,7 +303,26 @@ export default function DeliveryMgmt() {
       )}
 
       {/* ---------------- DELIVERIES LOG TABLE ---------------- */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm overflow-hidden space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
+          <h4 className="font-bold text-sm text-slate-750 dark:text-slate-300">Dispatch & Delivery Records</h4>
+          <div className="relative w-full sm:w-60">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search deliveries..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 pl-8 pr-8 py-1.5 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-saffron"
+            />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left border-collapse">
             <thead>
@@ -319,7 +339,42 @@ export default function DeliveryMgmt() {
               </tr>
             </thead>
             <tbody>
-              {deliveries.map((d) => {
+              {deliveries.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="text-center py-10 text-slate-400">
+                    No active dispatches logged yet. Click "Log New Dispatch" to dispatch orders.
+                  </td>
+                </tr>
+              ) : deliveries.filter(d => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  const cust = customers.find(c => c.id === d.customerId);
+                  const prod = products.find(p => p.id === d.productId);
+                  const custName = cust ? cust.shopName.toLowerCase() : '';
+                  const prodName = prod ? prod.name.toLowerCase() : '';
+                  const batch = (d.batchNumber || '').toLowerCase();
+                  const driver = (d.deliveredBy || '').toLowerCase();
+                  const date = (d.deliveryDate || '').toLowerCase();
+                  return custName.includes(term) || prodName.includes(term) || batch.includes(term) || driver.includes(term) || date.includes(term);
+                }).length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="text-center py-10 text-slate-400">
+                    No records match your search criteria.
+                  </td>
+                </tr>
+              ) : (
+                deliveries.filter(d => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  const cust = customers.find(c => c.id === d.customerId);
+                  const prod = products.find(p => p.id === d.productId);
+                  const custName = cust ? cust.shopName.toLowerCase() : '';
+                  const prodName = prod ? prod.name.toLowerCase() : '';
+                  const batch = (d.batchNumber || '').toLowerCase();
+                  const driver = (d.deliveredBy || '').toLowerCase();
+                  const date = (d.deliveryDate || '').toLowerCase();
+                  return custName.includes(term) || prodName.includes(term) || batch.includes(term) || driver.includes(term) || date.includes(term);
+                }).map((d) => {
                 const cust = customers.find(c => c.id === d.customerId);
                 const prod = products.find(p => p.id === d.productId);
                 return (
