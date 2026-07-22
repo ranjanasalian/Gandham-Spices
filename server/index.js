@@ -188,8 +188,14 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
     const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
     monthCostOfGoods += (c.quantityGiven || 0) * cost;
   });
+  
+  // Overhead expenses excluding Raw Materials and Packaging (which are already in Production Cost per pouch)
+  const monthOverheadExpenses = monthExpenses
+    .filter(e => e.category !== 'Raw Materials' && e.category !== 'Packaging')
+    .reduce((sum, e) => sum + e.amount, 0);
+
   const monthGrossProfit = monthRevenue - monthCostOfGoods;
-  const monthNetProfit = monthGrossProfit - monthExpenseTotal;
+  const monthNetProfit = monthGrossProfit - monthOverheadExpenses;
 
   // 3.1 THIS YEAR STATS
   const currentYearStr = todayStr.substring(0, 4);
@@ -220,8 +226,13 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
     const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
     yearCostOfGoods += (c.quantityGiven || 0) * cost;
   });
+
+  const yearOverheadExpenses = yearExpenses
+    .filter(e => e.category !== 'Raw Materials' && e.category !== 'Packaging')
+    .reduce((sum, e) => sum + e.amount, 0);
+
   const yearGrossProfit = yearRevenue - yearCostOfGoods;
-  const yearNetProfit = yearGrossProfit - yearExpenseTotal;
+  const yearNetProfit = yearGrossProfit - yearOverheadExpenses;
 
   // Inventory Totals
   const currentInventory = db.products.reduce((acc, p) => {
