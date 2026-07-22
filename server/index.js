@@ -749,8 +749,68 @@ const parsePouchGrams = (sizeStr) => {
   return num;
 };
 
+const migrateCustomerSuppliesToSales = (db) => {
+  if (!db || !db.customers) return;
+  if (!db.sales) db.sales = [];
+
+  const remainingCustomers = [];
+  let migrated = false;
+
+  db.customers.forEach(c => {
+    if (c.productId || (c.quantityGiven && c.quantityGiven > 0)) {
+      migrated = true;
+      let profile = remainingCustomers.find(rc => rc.shopName?.toLowerCase().trim() === c.shopName?.toLowerCase().trim());
+      if (!profile) {
+        profile = {
+          id: `c_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          date: c.date || new Date().toISOString().split('T')[0],
+          contactName: c.contactName || c.shopName,
+          shopName: c.shopName,
+          customerClassification: c.customerClassification || 'Retailer',
+          phoneNumber: c.phoneNumber || '',
+          address: c.address || '',
+          remarks: c.remarks || ''
+        };
+        remainingCustomers.push(profile);
+      }
+
+      const existingSale = db.sales.find(s => s.id === c.id || (s.shopName === c.shopName && s.date === c.date && s.productId === c.productId && s.quantityGiven === c.quantityGiven));
+      if (!existingSale) {
+        db.sales.push({
+          id: c.id.startsWith('c_') ? c.id.replace('c_', 's_') : `s_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          date: c.date || new Date().toISOString().split('T')[0],
+          customerId: profile.id,
+          shopName: c.shopName,
+          productId: c.productId,
+          productName: c.productName || 'Spice Product',
+          batchId: c.batchId || '',
+          batchNumber: c.batchNumber || 'Batch 1',
+          packSize: c.packSize || '50g',
+          quantityGiven: parseInt(c.quantityGiven || 0, 10),
+          wholesalePrice: parseFloat(c.wholesalePrice || 0),
+          totalAmountReceivable: parseFloat(c.totalAmountReceivable || 0),
+          amountReceived: parseFloat(c.amountReceived || 0),
+          balanceAmount: parseFloat(c.balanceAmount || 0),
+          paymentStatus: c.paymentStatus || 'Paid',
+          paymentDate: c.paymentDate || '',
+          remarks: c.remarks || ''
+        });
+      }
+    } else {
+      if (!remainingCustomers.some(rc => rc.id === c.id || rc.shopName?.toLowerCase().trim() === c.shopName?.toLowerCase().trim())) {
+        remainingCustomers.push(c);
+      }
+    }
+  });
+
+  if (migrated) {
+    db.customers = remainingCustomers;
+  }
+};
+
 const recalculateBatchStocks = (db) => {
   if (!db || !db.batches) return;
+  migrateCustomerSuppliesToSales(db);
   const sales = db.sales || [];
   db.batches.forEach(b => {
     let produced = parseInt(b.packetsProduced || 0, 10);
