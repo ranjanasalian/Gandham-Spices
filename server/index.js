@@ -565,20 +565,35 @@ app.get('/api/admin/ingredient-purchases', authenticateToken, (req, res) => {
 
 app.post('/api/admin/ingredient-purchases', authenticateToken, async (req, res) => {
   const db = getDB();
-  const { purchaseDate, rawMaterialId, quantity, totalCost, supplierName, notes } = req.body;
+  const { purchaseDate, rawMaterialId, quantity, totalCost, supplierName, notes, unit } = req.body;
   
   if (!purchaseDate || !rawMaterialId || !quantity || !totalCost) {
     return res.status(400).json({ message: 'Missing required purchase fields' });
   }
 
-  const rm = db.rawMaterials.find(m => m.id === rawMaterialId);
-  if (!rm) return res.status(404).json({ message: 'Raw material type not found' });
+  let rm = db.rawMaterials.find(m => m.id === rawMaterialId || m.name.toLowerCase() === rawMaterialId.toLowerCase());
+  if (!rm) {
+    rm = {
+      id: `rm_${Date.now()}`,
+      name: rawMaterialId,
+      unit: unit || 'kg',
+      minStockLevel: 1,
+      currentStock: 0,
+      totalPurchased: 0,
+      totalUsed: 0
+    };
+    db.rawMaterials.push(rm);
+  }
+
+  const purchaseUnit = unit || rm.unit || 'kg';
 
   const newPurchase = {
     id: `ip_${Date.now()}`,
     purchaseDate,
-    rawMaterialId,
+    rawMaterialId: rm.id,
+    rawMaterialName: rm.name,
     quantity: parseFloat(quantity),
+    unit: purchaseUnit,
     totalCost: parseFloat(totalCost),
     supplierName: supplierName || '',
     notes: notes || ''
@@ -593,7 +608,7 @@ app.post('/api/admin/ingredient-purchases', authenticateToken, async (req, res) 
     category: 'Raw Materials',
     amount: parseFloat(totalCost),
     date: purchaseDate,
-    description: `Purchased ${quantity} ${rm.unit} of ${rm.name} @ total ₹${totalCost}`
+    description: `Purchased ${quantity} ${purchaseUnit} of ${rm.name} @ total ₹${totalCost}`
   });
 
   // Log supplier purchase history if supplierName matches a registered supplier
@@ -603,7 +618,7 @@ app.post('/api/admin/ingredient-purchases', authenticateToken, async (req, res) 
       if (!supplier.purchaseHistory) supplier.purchaseHistory = [];
       supplier.purchaseHistory.unshift({
         date: purchaseDate,
-        item: `${rm.name} (${quantity} ${rm.unit})`,
+        item: `${rm.name} (${quantity} ${purchaseUnit})`,
         amount: parseFloat(totalCost)
       });
       supplier.outstandingPayments = parseFloat((supplier.outstandingPayments + parseFloat(totalCost)).toFixed(2));
@@ -613,7 +628,7 @@ app.post('/api/admin/ingredient-purchases', authenticateToken, async (req, res) 
   db.recentActivities.unshift({
     id: `a_${Date.now()}`,
     action: 'Purchased Ingredient',
-    details: `Purchased ${quantity} ${rm.unit} of ${rm.name} for ₹${totalCost}.`,
+    details: `Purchased ${quantity} ${purchaseUnit} of ${rm.name} for ₹${totalCost}.`,
     timestamp: new Date().toISOString()
   });
 
@@ -719,26 +734,50 @@ app.delete('/api/admin/ingredient-purchases/:id', authenticateToken, async (req,
 app.get('/api/admin/raw-materials', authenticateToken, (req, res) => {
   const db = getDB();
   db.rawMaterials.forEach(rm => {
-    const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
-    const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
+    // 1. Combine ALL purchases of this ingredient (by ID or matching name)
+    const purchases = (db.ingredientPurchases || []).filter(p => {
+      if (p.rawMaterialId === rm.id) return true;
+      if (p.rawMaterialName && p.rawMaterialName.toLowerCase() === rm.name.toLowerCase()) return true;
+      const pMaterial = db.rawMaterials.find(m => m.id === p.rawMaterialId);
+      return pMaterial && pMaterial.name.toLowerCase() === rm.name.toLowerCase();
+    });
 
+    const totalPurchased = purchases.reduce((sum, p) => {
+      const pUnit = p.unit || rm.unit || 'kg';
+      return sum + convertUnit(p.quantity, pUnit, rm.unit || 'kg');
+    }, 0);
+
+    // 2. Sum ALL quantities used across production batches
     let totalUsed = 0;
     db.batches.forEach(b => {
-      const recipe = db.recipes.find(r => r.id === b.recipeId);
+      const recipe = db.recipes.find(r => r.id === b.recipeId || r.productId === b.productId);
       if (recipe) {
-        const ing = recipe.ingredients.find(i => i.rawMaterialId === rm.id);
+        const ing = (recipe.ingredients || []).find(i => {
+          if (i.rawMaterialId === rm.id) return true;
+          const iMaterial = db.rawMaterials.find(m => m.id === i.rawMaterialId);
+          return iMaterial && iMaterial.name.toLowerCase() === rm.name.toLowerCase();
+        });
+
         if (ing) {
-          const product = db.products.find(p => p.id === recipe.productId);
+          const product = db.products.find(p => p.id === (b.productId || recipe.productId));
           const packSizeKg = parsePackSizeToKg(product ? product.packSize : '');
-          const qtyInRmUnit = convertUnit(ing.quantity, ing.unit || 'kg', rm.unit);
-          totalUsed += qtyInRmUnit * b.packetsProduced * packSizeKg;
+          
+          // Formula:
+          // ing.quantity is required per yield (e.g. 1 kg yield = yieldQuantity: 1)
+          // Total output produced in batch = b.packetsProduced * packSizeKg
+          const yieldKg = recipe.yieldQuantity || 1;
+          const totalBatchWeightKg = b.packetsProduced * packSizeKg;
+          
+          const qtyInRmUnit = convertUnit(ing.quantity, ing.unit || 'kg', rm.unit || 'kg');
+          const usageInRmUnit = (qtyInRmUnit / yieldKg) * totalBatchWeightKg;
+          totalUsed += usageInRmUnit;
         }
       }
     });
 
-    rm.totalPurchased = totalPurchased;
+    rm.totalPurchased = parseFloat(totalPurchased.toFixed(3));
     rm.totalUsed = parseFloat(totalUsed.toFixed(3));
-    rm.currentStock = parseFloat((totalPurchased - totalUsed).toFixed(3));
+    rm.currentStock = Math.max(0, parseFloat((totalPurchased - totalUsed).toFixed(3)));
   });
   res.json(db.rawMaterials);
 });
