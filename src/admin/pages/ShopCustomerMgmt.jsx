@@ -140,11 +140,11 @@ export default function ShopCustomerMgmt() {
     };
   });
 
-  const totalRegisteredShops = shopStats.length;
-  const totalPouchesAll = shopStats.reduce((acc, s) => acc + s.totalPouches, 0);
-  const totalGlobalDues = shopStats.reduce((acc, s) => acc + s.outstandingDues, 0);
-  const pendingAccountsCount = shopStats.filter(s => s.outstandingDues > 0).length;
-  const paidAccountsCount = shopStats.filter(s => s.outstandingDues === 0).length;
+  const totalRegisteredShops = customers.length;
+  const retailersCount = customers.filter(c => (c.customerClassification || 'Retailer') === 'Retailer').length;
+  const wholesalersCount = customers.filter(c => c.customerClassification === 'Wholesaler').length;
+  const distributorsCount = customers.filter(c => c.customerClassification === 'Distributor').length;
+  const directCustomersCount = customers.filter(c => c.customerClassification === 'Direct Customer').length;
 
   if (loading) {
     return (
@@ -198,30 +198,31 @@ export default function ShopCustomerMgmt() {
           </h4>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Pouches Supplied</p>
-          <h4 className="text-lg font-black mt-1 text-slate-800 dark:text-white flex items-center gap-1">
-            <Package className="w-4 h-4 text-orange-500" />
-            <span>{totalPouchesAll}</span>
+          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Retailers</p>
+          <h4 className="text-lg font-black mt-1 text-teal-500 flex items-center gap-1">
+            <Store className="w-4 h-4 text-teal-500" />
+            <span>{retailersCount}</span>
           </h4>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Total Outstanding Dues</p>
-          <h4 className="text-lg font-black mt-1 text-red-500 flex items-center gap-0.5">
-            <span>₹</span><span>{totalGlobalDues.toFixed(2)}</span>
+          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Wholesalers</p>
+          <h4 className="text-lg font-black mt-1 text-purple-500 flex items-center gap-1">
+            <Users className="w-4 h-4 text-purple-500" />
+            <span>{wholesalersCount}</span>
           </h4>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Pending Accounts</p>
-          <h4 className="text-lg font-black mt-1 text-red-400 flex items-center gap-1">
-            <Clock className="w-4 h-4" />
-            <span>{pendingAccountsCount}</span>
+          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Distributors</p>
+          <h4 className="text-lg font-black mt-1 text-blue-400 flex items-center gap-1">
+            <Package className="w-4 h-4 text-blue-400" />
+            <span>{distributorsCount}</span>
           </h4>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Paid Up Accounts</p>
-          <h4 className="text-lg font-black mt-1 text-emerald-400 flex items-center gap-1">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>{paidAccountsCount}</span>
+          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Direct Customers</p>
+          <h4 className="text-lg font-black mt-1 text-slate-400 flex items-center gap-1">
+            <Users className="w-4 h-4 text-slate-400" />
+            <span>{directCustomersCount}</span>
           </h4>
         </div>
       </div>
