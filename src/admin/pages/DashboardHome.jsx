@@ -116,113 +116,203 @@ export default function DashboardHome({ isDarkMode }) {
   const remainingTargetAmount = activeTarget ? Math.max(0, activeTarget.targetRevenue - revenueMonth) : 0;
   const targetPercent = activeTarget ? Math.min(100, Math.round((revenueMonth / activeTarget.targetRevenue) * 100)) : 0;
 
-  // Render Line Chart (Revenue & Profit) using pure SVG
+  // Helper to generate smooth cubic bezier spline paths
+  const getBezierPath = (points) => {
+    if (!points || points.length === 0) return '';
+    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+    if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i === 0 ? i : i - 1];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+    return d;
+  };
+
+  const getAreaPath = (points, bottomY) => {
+    if (!points || points.length === 0) return '';
+    const curve = getBezierPath(points);
+    const last = points[points.length - 1];
+    const first = points[0];
+    return `${curve} L ${last.x} ${bottomY} L ${first.x} ${bottomY} Z`;
+  };
+
+  // Render Smooth Bezier Area Chart (Revenue & Profit)
   const renderTrendChart = () => {
     const data = charts.dailyTrends || [];
-    if (data.length === 0) return <div className="text-center py-10 text-slate-400 text-xs">No data for selected period</div>;
+    if (data.length === 0) return <div className="text-center py-12 text-slate-400 text-xs">No ledger transactions for this period</div>;
 
-    const width = 600;
-    const height = 240;
-    const padding = 40;
+    const width = 640;
+    const height = 260;
+    const paddingLeft = 50;
+    const paddingRight = 20;
+    const paddingTop = 25;
+    const paddingBottom = 40;
+    const bottomY = height - paddingBottom;
 
-    const maxRev = Math.max(...data.map(d => Math.max(d.revenue, d.profit, 100)));
+    const maxVal = Math.max(...data.map(d => Math.max(d.revenue || 0, d.profit || 0, 100)));
     
-    const getX = (index) => padding + (index * (width - padding * 2)) / Math.max(data.length - 1, 1);
-    const getY = (val) => height - padding - (val * (height - padding * 2)) / maxRev;
+    const getX = (index) => paddingLeft + (index * (width - paddingLeft - paddingRight)) / Math.max(data.length - 1, 1);
+    const getY = (val) => bottomY - (val * (bottomY - paddingTop)) / maxVal;
 
-    let revPath = '';
-    let profitPath = '';
-    
-    data.forEach((d, i) => {
-      const x = getX(i);
-      const yRev = getY(d.revenue);
-      const yProfit = getY(d.profit);
+    const revPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.revenue || 0), revenue: d.revenue, date: d.date, sales: d.sales }));
+    const profitPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.profit || 0), profit: d.profit, date: d.date, sales: d.sales }));
 
-      if (i === 0) {
-        revPath = `M ${x} ${yRev}`;
-        profitPath = `M ${x} ${yProfit}`;
-      } else {
-        revPath += ` L ${x} ${yRev}`;
-        profitPath += ` L ${x} ${yProfit}`;
-      }
-    });
+    const revBezier = getBezierPath(revPoints);
+    const revArea = getAreaPath(revPoints, bottomY);
+
+    const profitBezier = getBezierPath(profitPoints);
+    const profitArea = getAreaPath(profitPoints, bottomY);
+
+    // Summary calculation for badges
+    const totalRev = data.reduce((sum, d) => sum + (d.revenue || 0), 0);
+    const totalProf = data.reduce((sum, d) => sum + (d.profit || 0), 0);
+    const peakRev = Math.max(...data.map(d => d.revenue || 0));
+    const marginPct = totalRev > 0 ? ((totalProf / totalRev) * 100).toFixed(1) : '0.0';
 
     return (
-      <div className="relative">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible">
-          {/* Y Axis Grid Lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio, index) => {
-            const y = padding + ratio * (height - padding * 2);
-            const val = Math.round(maxRev * (1 - ratio));
-            return (
-              <g key={index}>
-                <line x1={padding} y1={y} x2={width - padding} y2={y} stroke={isDarkMode ? '#334155' : '#e2e8f0'} strokeWidth="1" strokeDasharray="4 4" />
-                <text x={padding - 8} y={y + 4} textAnchor="end" className="text-[9px] font-semibold fill-slate-400">
-                  ₹{val}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* X Axis Labels */}
-          {data.map((d, i) => {
-            if (data.length > 10 && i % Math.round(data.length / 5) !== 0) return null;
-            const x = getX(i);
-            const labelDate = d.date.substring(5); // MM-DD
-            return (
-              <text key={i} x={x} y={height - padding + 18} textAnchor="middle" className="text-[9px] font-semibold fill-slate-400">
-                {labelDate}
-              </text>
-            );
-          })}
-
-          {/* Lines */}
-          <path d={revPath} fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          <path d={profitPath} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-
-          {/* Interactivity dots */}
-          {data.map((d, i) => {
-            const x = getX(i);
-            const yRev = getY(d.revenue);
-            const yProfit = getY(d.profit);
-
-            return (
-              <g key={i}>
-                <circle
-                  cx={x}
-                  cy={yRev}
-                  r="4"
-                  className="fill-saffron stroke-slate-900 stroke-2 cursor-pointer hover:r-6 transition-all"
-                  onMouseEnter={() => setHoveredDataPoint({ date: d.date, revenue: d.revenue, profit: d.profit, x, y: yRev })}
-                  onMouseLeave={() => setHoveredDataPoint(null)}
-                />
-                <circle
-                  cx={x}
-                  cy={yProfit}
-                  r="4"
-                  className="fill-emerald-500 stroke-slate-900 stroke-2 cursor-pointer hover:r-6 transition-all"
-                  onMouseEnter={() => setHoveredDataPoint({ date: d.date, revenue: d.revenue, profit: d.profit, x, y: yProfit })}
-                  onMouseLeave={() => setHoveredDataPoint(null)}
-                />
-              </g>
-            );
-          })}
-        </svg>
-
-        {hoveredDataPoint && (
-          <div
-            className="absolute bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 shadow-xl text-[10px] space-y-1 z-20 pointer-events-none"
-            style={{
-              left: `${(hoveredDataPoint.x / width) * 100}%`,
-              top: `${(hoveredDataPoint.y / height) * 100 - 65}%`,
-              transform: 'translateX(-50%)'
-            }}
-          >
-            <p className="font-bold border-b border-slate-700 pb-1">{hoveredDataPoint.date}</p>
-            <p className="flex justify-between gap-4"><span className="text-amber-500">Revenue:</span> <span>₹{hoveredDataPoint.revenue}</span></p>
-            <p className="flex justify-between gap-4"><span className="text-emerald-400">Profit:</span> <span>₹{hoveredDataPoint.profit}</span></p>
+      <div className="relative space-y-4">
+        {/* Executive Summary Badges */}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Peak Period Sales:</span>
+            <span className="font-black text-amber-500">₹{peakRev.toFixed(0)}</span>
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Avg Sales / Slot:</span>
+            <span className="font-black text-slate-700 dark:text-slate-200">₹{(totalRev / Math.max(data.length, 1)).toFixed(0)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Gross Margin:</span>
+            <span className={`font-black ${parseFloat(marginPct) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{marginPct}%</span>
+          </div>
+        </div>
+
+        <div className="relative">
+          <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible">
+            <defs>
+              <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
+              </linearGradient>
+              <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+
+            {/* Y-Axis Horizontal Grid Lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio, index) => {
+              const y = paddingTop + ratio * (bottomY - paddingTop);
+              const val = Math.round(maxVal * (1 - ratio));
+              return (
+                <g key={index}>
+                  <line x1={paddingLeft} y1={y} x2={width - paddingRight} y2={y} stroke={isDarkMode ? '#334155' : '#e2e8f0'} strokeWidth="1" strokeDasharray="3 3" />
+                  <text x={paddingLeft - 8} y={y + 3} textAnchor="end" className="text-[9px] font-bold fill-slate-400 font-mono">
+                    ₹{val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* X-Axis Dates / Labels */}
+            {data.map((d, i) => {
+              if (data.length > 12 && i % Math.ceil(data.length / 8) !== 0 && i !== data.length - 1) return null;
+              const x = getX(i);
+              const labelDate = d.date.length > 5 ? d.date.substring(5) : d.date; // MM-DD or Month name
+              return (
+                <text key={i} x={x} y={height - 12} textAnchor="middle" className="text-[9px] font-bold fill-slate-400 font-mono">
+                  {labelDate}
+                </text>
+              );
+            })}
+
+            {/* Area Fills */}
+            <path d={revArea} fill="url(#revGrad)" />
+            <path d={profitArea} fill="url(#profitGrad)" />
+
+            {/* Bezier Stroke Paths */}
+            <path d={revBezier} fill="none" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={profitBezier} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* Active Vertical Guide Indicator Line */}
+            {hoveredDataPoint && (
+              <line
+                x1={hoveredDataPoint.x}
+                y1={paddingTop}
+                x2={hoveredDataPoint.x}
+                y2={bottomY}
+                stroke={isDarkMode ? '#64748b' : '#94a3b8'}
+                strokeWidth="1.5"
+                strokeDasharray="4 4"
+              />
+            )}
+
+            {/* Interactive Data Markers */}
+            {data.map((d, i) => {
+              const x = getX(i);
+              const yRev = getY(d.revenue || 0);
+              const yProfit = getY(d.profit || 0);
+              const isHovered = hoveredDataPoint && hoveredDataPoint.index === i;
+
+              return (
+                <g key={i}>
+                  <circle
+                    cx={x}
+                    cy={yRev}
+                    r={isHovered ? '6' : '3.5'}
+                    className="fill-amber-500 stroke-slate-900 stroke-2 cursor-pointer transition-all duration-200"
+                    onMouseEnter={() => setHoveredDataPoint({ index: i, date: d.date, revenue: d.revenue, profit: d.profit, sales: d.sales, x, y: yRev })}
+                    onMouseLeave={() => setHoveredDataPoint(null)}
+                  />
+                  <circle
+                    cx={x}
+                    cy={yProfit}
+                    r={isHovered ? '6' : '3.5'}
+                    className="fill-emerald-500 stroke-slate-900 stroke-2 cursor-pointer transition-all duration-200"
+                    onMouseEnter={() => setHoveredDataPoint({ index: i, date: d.date, revenue: d.revenue, profit: d.profit, sales: d.sales, x, y: yProfit })}
+                    onMouseLeave={() => setHoveredDataPoint(null)}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Floating Glassmorphic Tooltip Card */}
+          {hoveredDataPoint && (
+            <div
+              className="absolute bg-slate-900/90 backdrop-blur-md border border-slate-700/80 text-white rounded-2xl p-3 shadow-2xl text-xs space-y-1.5 z-30 pointer-events-none w-48 transition-all duration-150 animate-fade-in"
+              style={{
+                left: `${(hoveredDataPoint.x / width) * 100}%`,
+                top: `${(hoveredDataPoint.y / height) * 100 - 80}%`,
+                transform: 'translateX(-50%)'
+              }}
+            >
+              <div className="flex justify-between items-center border-b border-slate-700/60 pb-1 font-bold text-slate-300">
+                <span>{hoveredDataPoint.date}</span>
+                {hoveredDataPoint.sales > 0 && <span className="text-[10px] text-saffron bg-saffron/10 px-1.5 py-0.5 rounded">{hoveredDataPoint.sales} sold</span>}
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-amber-400 font-medium">Revenue:</span>
+                <span className="font-black text-amber-400">₹{(hoveredDataPoint.revenue || 0).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-emerald-400 font-medium">Net Profit:</span>
+                <span className="font-black text-emerald-400">₹{(hoveredDataPoint.profit || 0).toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   };

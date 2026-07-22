@@ -325,7 +325,34 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
     }
   });
 
-  const dailyTrends = Object.values(dateMap).sort((a,b) => a.date.localeCompare(b.date));
+  let dailyTrends = [];
+  if (range === 'year') {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentYear = baseline.getFullYear();
+    const monthMap = {};
+    months.forEach((m, idx) => {
+      monthMap[idx] = { date: m, sales: 0, revenue: 0, profit: 0 };
+    });
+
+    db.sales.forEach(s => {
+      if (s.date) {
+        const d = new Date(s.date);
+        if (d.getFullYear() === currentYear) {
+          const mIdx = d.getMonth();
+          if (monthMap[mIdx]) {
+            monthMap[mIdx].revenue += s.totalAmountReceivable;
+            monthMap[mIdx].sales += s.quantityGiven;
+            const prod = db.products.find(p => p.id === s.productId);
+            const cost = prod ? (prod.productionCost || prod.costPrice || 0) : 0;
+            monthMap[mIdx].profit += (s.totalAmountReceivable - (s.quantityGiven * cost));
+          }
+        }
+      }
+    });
+    dailyTrends = Object.values(monthMap);
+  } else {
+    dailyTrends = Object.values(dateMap).sort((a,b) => a.date.localeCompare(b.date));
+  }
 
   // Product performance chart data (Top selling products)
   const productSalesMap = {};
