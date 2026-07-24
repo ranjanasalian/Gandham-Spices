@@ -26,6 +26,7 @@ export default function SalesMgmt() {
   const [productId, setProductId] = useState('');
   const [batchId, setBatchId] = useState('');
   const [quantityGiven, setQuantityGiven] = useState('');
+  const [priceType, setPriceType] = useState('Wholesale Price');
   const [paymentStatus, setPaymentStatus] = useState('Pending');
   const [amountReceived, setAmountReceived] = useState('0');
   const [paymentDate, setPaymentDate] = useState('');
@@ -63,6 +64,7 @@ export default function SalesMgmt() {
     setProductId(sale.productId || '');
     setBatchId(sale.batchId || '');
     setQuantityGiven((sale.quantityGiven || 0).toString());
+    setPriceType(sale.priceType || 'Wholesale Price');
     setAmountReceived((sale.amountReceived || 0).toString());
     setPaymentStatus(sale.paymentStatus || 'Pending');
     setPaymentDate(sale.paymentDate || '');
@@ -76,6 +78,7 @@ export default function SalesMgmt() {
     setProductId('');
     setBatchId('');
     setQuantityGiven('');
+    setPriceType('Wholesale Price');
     setAmountReceived('0');
     setPaymentDate('');
     setRemarks('');
@@ -124,6 +127,7 @@ export default function SalesMgmt() {
         productId,
         batchId,
         quantityGiven: qty,
+        priceType,
         amountReceived: parseFloat(amountReceived || 0),
         paymentStatus,
         paymentDate,
@@ -143,6 +147,7 @@ export default function SalesMgmt() {
       setProductId('');
       setBatchId('');
       setQuantityGiven('');
+      setPriceType('Wholesale Price');
       setAmountReceived('0');
       setPaymentDate('');
       setRemarks('');
@@ -184,8 +189,10 @@ export default function SalesMgmt() {
 
   const mrpVal = selectedProduct ? selectedProduct.mrp : 0;
   const wholesaleVal = selectedProduct ? selectedProduct.wholesalePrice : 0;
+  const unitPrice = priceType === 'MRP Price' ? mrpVal : wholesaleVal;
+
   const qtyVal = parseInt(quantityGiven, 10) || 0;
-  const receivableVal = parseFloat((qtyVal * wholesaleVal).toFixed(2));
+  const receivableVal = parseFloat((qtyVal * unitPrice).toFixed(2));
   const receivedVal = parseFloat(amountReceived) || 0;
   const balanceVal = parseFloat((receivableVal - receivedVal).toFixed(2));
 
@@ -222,6 +229,7 @@ export default function SalesMgmt() {
       batchId: s.batchId,
       batchNumber: s.batchNumber,
       quantityGiven: s.quantityGiven,
+      priceType: s.priceType || 'Wholesale Price',
       mrp: s.mrp,
       wholesalePrice: s.wholesalePrice,
       totalAmount: s.totalAmountReceivable
@@ -236,6 +244,7 @@ export default function SalesMgmt() {
       date: sale.date,
       customerId: sale.customerId,
       shopName: sale.shopName,
+      priceType: sale.priceType || 'Wholesale Price',
       customer: cust,
       items,
       subtotal,
@@ -371,27 +380,40 @@ export default function SalesMgmt() {
                 />
               </div>
               <div>
-                <label htmlFor="sales-rcvd-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Amount Received (₹)</label>
-                <input
-                  id="sales-rcvd-input"
-                  type="number"
-                  step="0.01"
-                  value={amountReceived}
-                  onChange={(e) => setAmountReceived(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron font-bold text-sm"
-                />
+                <label htmlFor="sales-pricetype-select" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Price Given In *</label>
+                <select
+                  id="sales-pricetype-select"
+                  value={priceType}
+                  onChange={(e) => setPriceType(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron font-semibold text-xs"
+                >
+                  <option value="Wholesale Price">Wholesale Price (Standard Trade Rate)</option>
+                  <option value="MRP Price">MRP Price (Full Retail Price)</option>
+                </select>
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="sales-rcvd-input" className="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Amount Received Today (₹)</label>
+              <input
+                id="sales-rcvd-input"
+                type="number"
+                step="0.01"
+                value={amountReceived}
+                onChange={(e) => setAmountReceived(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-saffron font-bold text-sm"
+              />
             </div>
 
             {/* Pricing Summary Box */}
             <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 p-4 rounded-2xl space-y-2 text-slate-400">
               <div className="flex justify-between items-center text-[11px]">
-                <span>MRP Price:</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">₹{mrpVal} / pack</span>
+                <span>Applied Rate Type:</span>
+                <span className="font-bold text-saffron">{priceType} (₹{unitPrice} / pack)</span>
               </div>
               <div className="flex justify-between items-center text-[11px]">
-                <span>Wholesale Trade Price:</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">₹{wholesaleVal} / pack</span>
+                <span>MRP vs Wholesale Reference:</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">MRP ₹{mrpVal} | Wholesale ₹{wholesaleVal}</span>
               </div>
               <div className="border-t border-slate-200 dark:border-slate-800 pt-2 flex justify-between items-center text-xs font-bold text-slate-800 dark:text-white">
                 <span>Total Amount Receivable:</span>

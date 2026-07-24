@@ -1,10 +1,19 @@
-import { Printer, Download, MessageSquare, X, CheckCircle2, Clock, Building2, MapPin, Phone, Mail, FileText } from 'lucide-react';
+import { Printer, Download, MessageSquare, X, CheckCircle2, Clock, Building2, MapPin, Phone, Mail, FileText, Tag, Sparkles } from 'lucide-react';
 
 export default function InvoiceModal({ invoice, onClose }) {
   if (!invoice) return null;
 
   const customer = invoice.customer || {};
   const items = invoice.items || [];
+  
+  // Check if invoice uses Wholesale Pricing vs MRP Pricing
+  // If ANY item has priceType === 'Wholesale Price', or invoice.priceType === 'Wholesale Price' (default)
+  const isWholesalePrice = items.some(item => (item.priceType || invoice.priceType || 'Wholesale Price') === 'Wholesale Price');
+
+  // Customer Classification Check
+  const custTypeRaw = (customer.customerClassification || customer.customerType || 'Retailer').toLowerCase();
+  const isRetailer = custTypeRaw.includes('retail') || custTypeRaw.includes('wholesale') || custTypeRaw.includes('shop');
+
   const subtotal = invoice.subtotal || items.reduce((acc, item) => acc + (item.totalAmount || 0), 0);
   const tax = invoice.tax || 0;
   const grandTotal = invoice.grandTotal || (subtotal + tax);
@@ -20,9 +29,21 @@ export default function InvoiceModal({ invoice, onClose }) {
     const rawPhone = customer.phoneNumber || customer.phone || '';
     const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
     
-    let itemsText = items.map(item => `- ${item.productName} (${item.quantityGiven}x @ ₹${item.wholesalePrice}) = ₹${item.totalAmount}`).join('\n');
+    let itemsText = items.map(item => {
+      const priceStr = isWholesalePrice 
+        ? `Wholesale ₹${item.wholesalePrice} [MRP ₹${item.mrp || item.wholesalePrice}]`
+        : `MRP ₹${item.mrp || item.wholesalePrice}`;
+      return `- ${item.productName} (${item.quantityGiven}x @ ${priceStr}) = ₹${item.totalAmount}`;
+    }).join('\n');
+
+    let marginOrDiscountNote = '';
+    if (isWholesalePrice) {
+      marginOrDiscountNote = isRetailer
+        ? '*Note:* Includes 20% Retailer Trade Margin.'
+        : '*Note:* Includes 20% Direct Customer Discount.';
+    }
     
-    const message = `*GANDHAM SPICES — INVOICE*
+    const message = `*GANDHAM SPICES — TAX INVOICE*
 --------------------------------
 *Invoice No:* ${invoice.invoiceNumber}
 *Date:* ${invoice.date}
@@ -30,7 +51,7 @@ export default function InvoiceModal({ invoice, onClose }) {
 ${customer.contactName ? `*Contact:* ${customer.contactName}\n` : ''}
 *Order Breakdown:*
 ${itemsText}
-
+${marginOrDiscountNote ? `\n${marginOrDiscountNote}` : ''}
 --------------------------------
 *Grand Total:* ₹${grandTotal.toFixed(2)}
 *Amount Paid:* ₹${amountPaid.toFixed(2)}
@@ -64,12 +85,15 @@ Website: https://gandhamspices.in`;
               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${isPaid ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
                 {isPaid ? 'Paid' : 'Payment Pending'}
               </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                {isWholesalePrice ? 'Wholesale Pricing' : 'MRP Retail Pricing'}
+              </span>
             </div>
             
             <div className="flex items-center gap-2">
               <button
                 onClick={handleWhatsAppShare}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow transition-colors cursor-pointer"
                 title="Share Invoice on WhatsApp"
               >
                 <MessageSquare className="w-4 h-4" />
@@ -77,7 +101,7 @@ Website: https://gandhamspices.in`;
               </button>
               <button
                 onClick={handlePrint}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-saffron hover:bg-orange-500 text-white font-bold rounded-xl shadow transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-saffron hover:bg-orange-500 text-white font-bold rounded-xl shadow transition-colors cursor-pointer"
                 title="Print or Download PDF"
               >
                 <Printer className="w-4 h-4" />
@@ -85,7 +109,7 @@ Website: https://gandhamspices.in`;
               </button>
               <button
                 onClick={onClose}
-                className="p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -124,15 +148,16 @@ Website: https://gandhamspices.in`;
             {/* Billed To / Buyer Info */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
-                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Billed To (Buyer Shop):</h4>
-                <p className="font-bold text-sm text-slate-900">{customer.shopName || invoice.shopName || 'Retail Customer'}</p>
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Billed To (Buyer Shop / Customer):</h4>
+                <p className="font-bold text-sm text-slate-900">{customer.shopName || invoice.shopName || 'Customer'}</p>
                 {customer.contactName && <p className="text-slate-600">Attn: {customer.contactName}</p>}
                 {customer.address && <p className="text-slate-500 mt-0.5">{customer.address}</p>}
                 {customer.phoneNumber && <p className="text-slate-500 font-medium">Phone: {customer.phoneNumber}</p>}
               </div>
               <div className="sm:text-right space-y-1">
-                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dispatch Details:</h4>
-                <p className="text-slate-600">Dispatched From: <strong className="text-slate-800">Brahmavar Hub</strong></p>
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dispatch & Billing Specs:</h4>
+                <p className="text-slate-600">Classification: <strong className="text-slate-800">{customer.customerClassification || customer.customerType || 'Retailer'}</strong></p>
+                <p className="text-slate-600">Price Structure: <strong className="text-slate-800">{isWholesalePrice ? 'Wholesale Trade Rate' : 'MRP Retail Rate'}</strong></p>
                 <p className="text-slate-600">Payment Terms: <strong className="text-slate-800">{isPaid ? 'Immediate Settlement' : 'Credit Dues'}</strong></p>
               </div>
             </div>
@@ -146,27 +171,65 @@ Website: https://gandhamspices.in`;
                     <th className="py-2.5 px-3">Product Item</th>
                     <th className="py-2.5 px-3">Batch #</th>
                     <th className="py-2.5 px-3 text-center">Qty (Packs)</th>
-                    <th className="py-2.5 px-3 text-right">Unit Price</th>
+                    {isWholesalePrice ? (
+                      <>
+                        <th className="py-2.5 px-3 text-right">MRP Price</th>
+                        <th className="py-2.5 px-3 text-right">Wholesale Price</th>
+                      </>
+                    ) : (
+                      <th className="py-2.5 px-3 text-right">MRP Price</th>
+                    )}
                     <th className="py-2.5 px-3 text-right">Total Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 font-medium">
-                  {items.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="py-3 px-3 text-slate-400 font-bold">{idx + 1}</td>
-                      <td className="py-3 px-3">
-                        <span className="font-bold text-slate-900 block">{item.productName}</span>
-                        {item.packSize && <span className="text-[10px] text-slate-500">Pack Size: {item.packSize}</span>}
-                      </td>
-                      <td className="py-3 px-3 font-mono text-[11px] text-slate-600">{item.batchNumber || 'N/A'}</td>
-                      <td className="py-3 px-3 text-center font-bold text-slate-800">{item.quantityGiven}</td>
-                      <td className="py-3 px-3 text-right text-slate-600">₹{item.wholesalePrice}</td>
-                      <td className="py-3 px-3 text-right font-black text-slate-900">₹{item.totalAmount ? item.totalAmount.toFixed(2) : (item.quantityGiven * item.wholesalePrice).toFixed(2)}</td>
-                    </tr>
-                  ))}
+                  {items.map((item, idx) => {
+                    const itemPriceType = item.priceType || invoice.priceType || 'Wholesale Price';
+                    const unitPriceUsed = itemPriceType === 'MRP Price' ? (item.mrp || item.wholesalePrice) : item.wholesalePrice;
+                    const totalAmt = item.totalAmount !== undefined ? item.totalAmount : (item.quantityGiven * unitPriceUsed);
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="py-3 px-3 text-slate-400 font-bold">{idx + 1}</td>
+                        <td className="py-3 px-3">
+                          <span className="font-bold text-slate-900 block">{item.productName}</span>
+                          {item.packSize && <span className="text-[10px] text-slate-500">Pack Size: {item.packSize}</span>}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[11px] text-slate-600">{item.batchNumber || 'N/A'}</td>
+                        <td className="py-3 px-3 text-center font-bold text-slate-800">{item.quantityGiven}</td>
+                        
+                        {isWholesalePrice ? (
+                          <>
+                            <td className="py-3 px-3 text-right text-slate-500 line-through">₹{item.mrp || item.wholesalePrice}</td>
+                            <td className="py-3 px-3 text-right font-bold text-slate-800">₹{item.wholesalePrice}</td>
+                          </>
+                        ) : (
+                          <td className="py-3 px-3 text-right font-bold text-slate-800">₹{item.mrp || item.wholesalePrice}</td>
+                        )}
+
+                        <td className="py-3 px-3 text-right font-black text-slate-900">₹{totalAmt.toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+
+            {/* Special Pricing Margin / Discount Note Banner */}
+            {isWholesalePrice && (
+              <div className={`p-3 rounded-xl border text-[11px] font-semibold flex items-center gap-2 ${
+                isRetailer 
+                  ? 'bg-amber-50 border-amber-200 text-amber-800' 
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              }`}>
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                <span>
+                  {isRetailer 
+                    ? 'Retailer Benefit: Includes 20% Retailer Trade Margin.' 
+                    : 'Special Offer: Includes 20% Direct Customer Discount.'}
+                </span>
+              </div>
+            )}
 
             {/* Financial Summary Calculation Box */}
             <div className="flex justify-end pt-2">

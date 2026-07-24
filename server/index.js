@@ -246,47 +246,74 @@ app.get('/api/admin/dashboard-stats', authenticateToken, (req, res) => {
     .filter(p => p.status === 'Pending')
     .reduce((acc, p) => acc + p.pendingAmount, 0);
 
-  const lowStockMaterialsList = db.rawMaterials.map(rm => {
-    const purchases = (db.ingredientPurchases || []).filter(p => p.rawMaterialId === rm.id);
-    const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
+  const lowStockMaterialsList = (db.rawMaterials || []).map(rm => {
+    const purchases = (db.ingredientPurchases || []).filter(p => {
+      if (p.rawMaterialId === rm.id) return true;
+      if (p.rawMaterialName && p.rawMaterialName.toLowerCase() === rm.name.toLowerCase()) return true;
+      const pMaterial = db.rawMaterials.find(m => m.id === p.rawMaterialId);
+      return pMaterial && pMaterial.name.toLowerCase() === rm.name.toLowerCase();
+    });
+
+    const totalPurchased = purchases.reduce((sum, p) => {
+      const pUnit = p.unit || rm.unit || 'kg';
+      return sum + convertUnit(p.quantity, pUnit, rm.unit || 'kg');
+    }, 0);
+
     let totalUsed = 0;
-    db.batches.forEach(b => {
-      const r = db.recipes.find(rec => rec.id === b.recipeId);
-      if (r) {
-        const rIng = r.ingredients.find(ri => ri.rawMaterialId === rm.id);
-        if (rIng) {
-          totalUsed += (rIng.quantity / r.yieldQuantity) * b.packetsProduced;
+    (db.batches || []).forEach(b => {
+      const recipe = db.recipes.find(r => r.id === b.recipeId || r.productId === b.productId);
+      if (recipe) {
+        const ing = (recipe.ingredients || []).find(i => {
+          if (i.rawMaterialId === rm.id) return true;
+          const iMaterial = db.rawMaterials.find(m => m.id === i.rawMaterialId);
+          return iMaterial && iMaterial.name.toLowerCase() === rm.name.toLowerCase();
+        });
+
+        if (ing) {
+          const product = db.products.find(p => p.id === (b.productId || recipe.productId));
+          const packSizeKg = parsePackSizeToKg(product ? product.packSize : '');
+          const yieldKg = recipe.yieldQuantity || 1;
+          const totalBatchWeightKg = b.packetsProduced * packSizeKg;
+          
+          const qtyInRmUnit = convertUnit(ing.quantity, ing.unit || 'kg', rm.unit || 'kg');
+          const usageInRmUnit = (qtyInRmUnit / yieldKg) * totalBatchWeightKg;
+          totalUsed += usageInRmUnit;
         }
       }
     });
-    const currentStock = Math.max(0, totalPurchased - totalUsed);
-    if (currentStock < rm.minStockLevel) {
+
+    const currentStock = Math.max(0, parseFloat((totalPurchased - totalUsed).toFixed(3)));
+    const minThreshold = parseFloat(rm.minStockLevel || 0);
+
+    if (minThreshold > 0 && currentStock < minThreshold) {
       return {
         id: rm.id,
         type: 'Raw Material',
         name: rm.name,
-        currentStock: `${currentStock.toFixed(2)} ${rm.unit}`,
-        threshold: `${rm.minStockLevel} ${rm.unit}`,
-        actionUrl: '/admin/purchases',
+        currentStock: `${currentStock.toFixed(2)} ${rm.unit || 'kg'}`,
+        threshold: `${minThreshold.toFixed(2)} ${rm.unit || 'kg'}`,
+        actionUrl: '/admin/purchase-history',
         actionText: 'Restock Ingredient'
       };
     }
     return null;
   }).filter(Boolean);
 
-  const lowStockProductsList = db.products.map(p => {
-    const productBatches = db.batches.filter(b => b.productId === p.id);
+  const lowStockProductsList = (db.products || []).map(p => {
+    const productBatches = (db.batches || []).filter(b => b.productId === p.id);
     const totalProduced = productBatches.reduce((sum, b) => sum + b.packetsProduced, 0);
-    const productSales = db.sales.filter(s => s.productId === p.id);
+    const productSales = (db.sales || []).filter(s => s.productId === p.id);
     const totalSold = productSales.reduce((sum, s) => sum + s.quantityGiven, 0);
     const currentStock = Math.max(0, totalProduced - totalSold);
-    if (currentStock < 20) {
+    const minThreshold = p.minStockLevel !== undefined ? p.minStockLevel : 10;
+
+    if (minThreshold > 0 && currentStock < minThreshold) {
       return {
         id: p.id,
         type: 'Finished Product Pouch',
         name: p.name,
         currentStock: `${currentStock} packs`,
-        threshold: `20 packs`,
+        threshold: `${minThreshold} packs`,
         actionUrl: '/admin/production',
         actionText: 'Log Production Batch'
       };
@@ -1464,6 +1491,8 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
 
   const qty = parseInt(quantityGiven, 10) || 0;
   const received = parseFloat(amountReceived || 0);
+  const selectedPriceType = req.body.priceType || 'Wholesale Price';
+  const unitPriceUsed = selectedPriceType === 'MRP Price' ? product.mrp : product.wholesalePrice;
 
   if (batch.remainingStock < qty) {
     return res.status(400).json({ 
@@ -1471,7 +1500,7 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
     });
   }
 
-  const totalReceivable = qty * product.wholesalePrice;
+  const totalReceivable = qty * unitPriceUsed;
   const balance = totalReceivable - received;
 
   const yearStr = new Date().getFullYear();
@@ -1490,6 +1519,7 @@ app.post('/api/admin/sales', authenticateToken, async (req, res) => {
     batchNumber: batch.batchNumber,
     packSize: product.packSize,
     quantityGiven: qty,
+    priceType: selectedPriceType,
     mrp: product.mrp,
     wholesalePrice: product.wholesalePrice,
     totalAmountReceivable: parseFloat(totalReceivable.toFixed(2)),
@@ -1550,6 +1580,7 @@ app.get('/api/admin/invoices', authenticateToken, (req, res) => {
         date: s.date,
         customerId: s.customerId,
         shopName: s.shopName,
+        priceType: s.priceType || 'Wholesale Price',
         customer: cust || { shopName: s.shopName || 'Direct Shop', ownerName: '', address: '', phoneNumber: '' },
         items: [],
         subtotal: 0,
@@ -1559,6 +1590,8 @@ app.get('/api/admin/invoices', authenticateToken, (req, res) => {
         remarks: s.remarks || ''
       };
     }
+
+    if (s.priceType) groups[invNo].priceType = s.priceType;
     
     groups[invNo].items.push({
       saleId: s.id,
@@ -1568,6 +1601,7 @@ app.get('/api/admin/invoices', authenticateToken, (req, res) => {
       batchId: s.batchId,
       batchNumber: s.batchNumber,
       quantityGiven: s.quantityGiven,
+      priceType: s.priceType || 'Wholesale Price',
       mrp: s.mrp,
       wholesalePrice: s.wholesalePrice,
       totalAmount: s.totalAmountReceivable
@@ -1597,7 +1631,7 @@ app.put('/api/admin/sales/:id', authenticateToken, async (req, res) => {
   if (index === -1) return res.status(404).json({ message: 'Sale record not found' });
 
   const current = db.sales[index];
-  const { date, customerId, productId, batchId, quantityGiven, amountReceived, paymentStatus, paymentDate, remarks } = req.body;
+  const { date, customerId, productId, batchId, quantityGiven, priceType, amountReceived, paymentStatus, paymentDate, remarks } = req.body;
 
   const targetCustId = customerId || current.customerId;
   const customer = db.customers.find(c => c.id === targetCustId);
@@ -1613,8 +1647,10 @@ app.put('/api/admin/sales/:id', authenticateToken, async (req, res) => {
 
   const qty = parseInt(quantityGiven !== undefined ? quantityGiven : current.quantityGiven, 10) || 0;
   const received = parseFloat(amountReceived !== undefined ? amountReceived : current.amountReceived) || 0;
+  const selectedPriceType = priceType || current.priceType || 'Wholesale Price';
+  const unitPriceUsed = selectedPriceType === 'MRP Price' ? product.mrp : product.wholesalePrice;
 
-  const totalReceivable = qty * product.wholesalePrice;
+  const totalReceivable = qty * unitPriceUsed;
   const balance = totalReceivable - received;
 
   if (customer) {
@@ -1632,6 +1668,7 @@ app.put('/api/admin/sales/:id', authenticateToken, async (req, res) => {
     batchNumber: batch.batchNumber,
     packSize: product.packSize,
     quantityGiven: qty,
+    priceType: selectedPriceType,
     mrp: product.mrp,
     wholesalePrice: product.wholesalePrice,
     totalAmountReceivable: parseFloat(totalReceivable.toFixed(2)),

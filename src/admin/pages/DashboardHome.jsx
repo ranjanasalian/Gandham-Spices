@@ -620,19 +620,18 @@ export default function DashboardHome({ isDarkMode }) {
             </div>
 
             <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-              {(() => {
-                const itemsList = (summary.lowStockItemsList && summary.lowStockItemsList.length > 0)
-                  ? summary.lowStockItemsList
-                  : [
-                      { type: 'Finished Product Pouch', name: 'Biryani Marination Mix (100g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
-                      { type: 'Finished Product Pouch', name: 'Temple-Style Rasam Powder (50g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
-                      { type: 'Finished Product Pouch', name: 'Chicken Sukka Masala (50g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
-                      { type: 'Finished Product Pouch', name: 'Biryani Marination Mix (50g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
-                      { type: 'Finished Product Pouch', name: 'Chicken Sukka Masala (100g)', currentStock: '0 packs', threshold: '20 packs', actionUrl: '/admin/production', actionText: 'Log Production Batch' },
-                      { type: 'Raw Material Ingredient', name: 'Byadgi Red Chilli', currentStock: '0.00 kg', threshold: '1.00 kg', actionUrl: '/admin/purchases', actionText: 'Restock Ingredient' }
-                    ];
-
-                return itemsList.map((item, idx) => (
+              {(!summary.lowStockItemsList || summary.lowStockItemsList.length === 0) ? (
+                <div className="text-center py-8 space-y-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-500 mx-auto flex items-center justify-center">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-800 dark:text-white">All Stock Levels Healthy!</h4>
+                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">No raw materials or product inventories are currently below safety thresholds.</p>
+                  </div>
+                </div>
+              ) : (
+                summary.lowStockItemsList.map((item, idx) => (
                   <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 p-3.5 rounded-2xl flex items-center justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -659,8 +658,8 @@ export default function DashboardHome({ isDarkMode }) {
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                ));
-              })()}
+                ))
+              )}
             </div>
 
             <div className="pt-2 flex justify-end border-t border-slate-100 dark:border-slate-800">
