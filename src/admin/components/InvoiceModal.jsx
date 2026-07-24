@@ -1,7 +1,10 @@
-import { Printer, Download, MessageSquare, X, CheckCircle2, Clock, Building2, MapPin, Phone, Mail, FileText, Tag, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Printer, Download, MessageSquare, X, CheckCircle2, Clock, Building2, MapPin, Phone, Mail, FileText, Tag, Sparkles, Copy } from 'lucide-react';
 
 export default function InvoiceModal({ invoice, onClose }) {
   if (!invoice) return null;
+
+  const [copied, setCopied] = useState(false);
 
   const customer = invoice.customer || {};
   const items = invoice.items || [];
@@ -42,10 +45,7 @@ export default function InvoiceModal({ invoice, onClose }) {
     window.print();
   };
 
-  const handleWhatsAppShare = () => {
-    const rawPhone = customer.phoneNumber || customer.phone || '';
-    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
-    
+  const getInvoiceText = () => {
     let itemsText = items.map(item => {
       if (showWholesaleColumn) {
         return `- ${item.productName} (${item.quantityGiven}x @ Wholesale ₹${item.wholesalePrice} [MRP ₹${item.mrp || item.wholesalePrice}]) = ₹${(item.quantityGiven * item.wholesalePrice).toFixed(2)}`;
@@ -67,7 +67,7 @@ export default function InvoiceModal({ invoice, onClose }) {
         : '*Note:* Includes 20% Direct Customer Discount.';
     }
     
-    const message = `*GANDHAM SPICES — TAX INVOICE*
+    return `*GANDHAM SPICES — TAX INVOICE*
 --------------------------------
 *Invoice No:* ${invoice.invoiceNumber}
 *Date:* ${invoice.date}
@@ -85,11 +85,23 @@ ${marginOrDiscountNote ? `\n${marginOrDiscountNote}` : ''}
 
 Thank you for choosing Gandham Spices!
 Website: https://gandhamspices.in`;
+  };
 
+  const handleCopyText = () => {
+    const text = getInvoiceText();
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleWhatsAppShare = () => {
+    const rawPhone = customer.phoneNumber || customer.phone || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    const message = getInvoiceText();
     const encodedMsg = encodeURIComponent(message);
     const whatsappUrl = cleanPhone 
-      ? `https://api.whatsapp.com/send?phone=${cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone}&text=${encodedMsg}`
-      : `https://api.whatsapp.com/send?text=${encodedMsg}`;
+      ? `https://wa.me/${cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone}?text=${encodedMsg}`
+      : `https://wa.me/?text=${encodedMsg}`;
     
     window.open(whatsappUrl, '_blank');
   };
@@ -116,6 +128,14 @@ Website: https://gandhamspices.in`;
             </div>
             
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopyText}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl transition-colors cursor-pointer"
+                title="Copy Invoice text to clipboard"
+              >
+                {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? 'Copied!' : 'Copy Text'}</span>
+              </button>
               <button
                 onClick={handleWhatsAppShare}
                 className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow transition-colors cursor-pointer"
