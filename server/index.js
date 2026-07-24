@@ -11,6 +11,15 @@ const JWT_SECRET = 'gandham-secret-key-2026';
 app.use(cors());
 app.use(express.json());
 
+// Security: Prevent search engines from indexing or caching any admin/API data
+app.use((req, res, next) => {
+  if (req.path.startsWith('/admin') || req.path.startsWith('/api/admin')) {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  }
+  next();
+});
+
 // Helper: Parse Date baseline (always defaulting to 2026-07-20 for realistic dashboard stats)
 const getBaselineDate = () => new Date('2026-07-20');
 

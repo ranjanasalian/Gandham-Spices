@@ -39,6 +39,27 @@ export default function AdminApp() {
   const [currentTab, setCurrentTab] = useState(getTabFromPath());
   const [isDarkMode, setIsDarkMode] = useState(true);
 
+  // Security: Inject noindex meta tag dynamically while inside admin portal
+  useEffect(() => {
+    let metaRobots = document.querySelector('meta[name="robots"]');
+    let created = false;
+    if (!metaRobots) {
+      metaRobots = document.createElement('meta');
+      metaRobots.name = 'robots';
+      document.head.appendChild(metaRobots);
+      created = true;
+    }
+    metaRobots.content = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
+
+    return () => {
+      if (created && metaRobots) {
+        metaRobots.remove();
+      } else if (metaRobots) {
+        metaRobots.content = 'index, follow';
+      }
+    };
+  }, []);
+
   // Sync tab state when back/forward browser buttons are pressed
   useEffect(() => {
     const handlePopState = () => {

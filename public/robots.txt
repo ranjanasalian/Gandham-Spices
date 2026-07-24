@@ -1,0 +1,15 @@
+# https://gandhamspices.in/robots.txt
+# Strict Search Engine Crawling & Indexing Rules
+
+User-agent: *
+Disallow: /admin
+Disallow: /admin/
+Disallow: /admin/*
+Disallow: /api/admin
+Disallow: /api/admin/*
+
+# Allow public customer pages
+Allow: /
+Allow: /products
+Allow: /about
+Allow: /contact
