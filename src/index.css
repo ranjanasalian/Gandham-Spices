@@ -146,13 +146,27 @@ table th, table td {
     visibility: hidden !important;
   }
 
+  /* Reset all parent wrappers containing printable content */
+  div:has(> .printable-invoice-content),
+  div:has(> div > .printable-invoice-content),
+  div:has(> div > div > .printable-invoice-content) {
+    position: static !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    transform: none !important;
+    animation: none !important;
+  }
+
   .print\:block, .print\:block *,
   .printable-invoice-content, .printable-invoice-content * {
     visibility: visible !important;
   }
 
   .print\:block, .printable-invoice-content {
-    position: fixed !important;
+    position: absolute !important;
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
@@ -171,7 +185,7 @@ table th, table td {
   }
 
   @page {
-    margin: 1cm;
+    margin: 0.8cm;
     size: auto;
   }
 }

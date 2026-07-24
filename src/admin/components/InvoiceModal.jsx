@@ -95,12 +95,12 @@ Website: https://gandhamspices.in`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto print:static print:p-0 print:m-0 print:overflow-visible">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-0" onClick={onClose} />
+      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-0 print:hidden" onClick={onClose} />
 
-      <div className="relative z-10 flex min-h-full items-center justify-center p-4 text-center">
-        <div className="relative my-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-3xl text-left shadow-2xl animate-fade-in-up text-xs space-y-6">
+      <div className="relative z-10 flex min-h-full items-center justify-center p-4 text-center print:block print:p-0 print:m-0 print:min-h-0 print:static">
+        <div className="relative my-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-3xl text-left shadow-2xl animate-fade-in-up text-xs space-y-6 print:m-0 print:p-0 print:border-none print:shadow-none print:static print:transform-none print:animate-none">
 
           {/* Top Bar Action Controls (Hidden on Print) */}
           <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4 print:hidden flex-wrap gap-3">
