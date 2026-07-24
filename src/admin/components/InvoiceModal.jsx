@@ -14,7 +14,11 @@ export default function InvoiceModal({ invoice, onClose }) {
   const custTypeRaw = (customer.customerClassification || customer.customerType || 'Retailer').toLowerCase();
   const isRetailer = custTypeRaw.includes('retail') || custTypeRaw.includes('wholesale') || custTypeRaw.includes('shop');
 
+  // Subtotal & Discount calculations
+  const mrpSubtotal = items.reduce((acc, item) => acc + (item.quantityGiven * (item.mrp || item.wholesalePrice || 0)), 0);
   const subtotal = invoice.subtotal || items.reduce((acc, item) => acc + (item.totalAmount || 0), 0);
+  const discountVal = isWholesalePrice ? Math.max(0, mrpSubtotal - subtotal) : (invoice.discount || 0);
+
   const tax = invoice.tax || 0;
   const grandTotal = invoice.grandTotal || (subtotal + tax);
   const amountPaid = invoice.amountReceived !== undefined ? invoice.amountReceived : grandTotal;
@@ -200,11 +204,11 @@ Website: https://gandhamspices.in`;
                         
                         {isWholesalePrice ? (
                           <>
-                            <td className="py-3 px-3 text-right text-slate-500 line-through">₹{item.mrp || item.wholesalePrice}</td>
-                            <td className="py-3 px-3 text-right font-bold text-slate-800">₹{item.wholesalePrice}</td>
+                            <td className="py-3 px-3 text-right text-slate-700 font-semibold">₹{item.mrp || item.wholesalePrice}</td>
+                            <td className="py-3 px-3 text-right font-bold text-slate-900">₹{item.wholesalePrice}</td>
                           </>
                         ) : (
-                          <td className="py-3 px-3 text-right font-bold text-slate-800">₹{item.mrp || item.wholesalePrice}</td>
+                          <td className="py-3 px-3 text-right font-bold text-slate-900">₹{item.mrp || item.wholesalePrice}</td>
                         )}
 
                         <td className="py-3 px-3 text-right font-black text-slate-900">₹{totalAmt.toFixed(2)}</td>
@@ -235,12 +239,12 @@ Website: https://gandhamspices.in`;
             <div className="flex justify-end pt-2">
               <div className="w-full sm:w-72 space-y-2 text-xs">
                 <div className="flex justify-between text-slate-600">
-                  <span>Subtotal:</span>
-                  <span className="font-semibold text-slate-900">₹{subtotal.toFixed(2)}</span>
+                  <span>Subtotal {isWholesalePrice ? '(at MRP)' : ''}:</span>
+                  <span className="font-semibold text-slate-900">₹{(isWholesalePrice ? mrpSubtotal : subtotal).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Discount:</span>
-                  <span className="font-semibold text-slate-900">₹0.00</span>
+                <div className="flex justify-between text-emerald-600 font-bold">
+                  <span>{isWholesalePrice ? (isRetailer ? 'Retailer Margin (20%):' : 'Discount (20%):') : 'Discount:'}</span>
+                  <span>{discountVal > 0 ? `-₹${discountVal.toFixed(2)}` : '₹0.00'}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>GST / Tax:</span>
