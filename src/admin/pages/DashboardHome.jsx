@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import {
   TrendingUp, TrendingDown, DollarSign, Package, AlertTriangle, Users,
-  ShoppingBag, Calendar, ArrowRight, RefreshCw, BarChart2, ShieldAlert, ClipboardList, Store, Archive, X
+  ShoppingBag, Calendar, ArrowRight, RefreshCw, BarChart2, ShieldAlert, ClipboardList, Store, Archive, X, CheckCircle2
 } from 'lucide-react';
 
 export default function DashboardHome({ isDarkMode }) {
