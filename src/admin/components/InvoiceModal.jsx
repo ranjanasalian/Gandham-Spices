@@ -6,23 +6,36 @@ export default function InvoiceModal({ invoice, onClose }) {
   const customer = invoice.customer || {};
   const items = invoice.items || [];
   
-  // Check if invoice uses Wholesale Pricing vs MRP Pricing
-  // If ANY item has priceType === 'Wholesale Price', or invoice.priceType === 'Wholesale Price' (default)
+  // Pricing & Customer Type Checks
   const isWholesalePrice = items.some(item => (item.priceType || invoice.priceType || 'Wholesale Price') === 'Wholesale Price');
-
-  // Customer Classification Check
   const custTypeRaw = (customer.customerClassification || customer.customerType || 'Retailer').toLowerCase();
   const isRetailer = custTypeRaw.includes('retail') || custTypeRaw.includes('wholesale') || custTypeRaw.includes('shop');
 
+  // Case 1: Retailer + Wholesale Price -> Show Wholesale Column
+  // Case 2: Direct Customer + MRP Price -> Hide Wholesale Column, Full MRP, No Discount
+  // Case 3: Direct Customer + Wholesale Price -> Hide Wholesale Column, Show MRP in table, Apply 20% Discount below
+  const showWholesaleColumn = isRetailer && isWholesalePrice;
+
   // Subtotal & Discount calculations
   const mrpSubtotal = items.reduce((acc, item) => acc + (item.quantityGiven * (item.mrp || item.wholesalePrice || 0)), 0);
-  const subtotal = invoice.subtotal || items.reduce((acc, item) => acc + (item.totalAmount || 0), 0);
-  const discountVal = isWholesalePrice ? Math.max(0, mrpSubtotal - subtotal) : (invoice.discount || 0);
+  const wholesaleSubtotal = items.reduce((acc, item) => acc + (item.quantityGiven * (item.wholesalePrice || item.mrp || 0)), 0);
+  
+  // Effective totals based on selected price type & customer mode
+  let invoiceSubtotal = mrpSubtotal;
+  let discountVal = 0;
+  let calculatedGrandTotal = mrpSubtotal;
+
+  if (isWholesalePrice) {
+    discountVal = Math.max(0, mrpSubtotal - wholesaleSubtotal);
+    calculatedGrandTotal = wholesaleSubtotal;
+  } else {
+    calculatedGrandTotal = mrpSubtotal;
+  }
 
   const tax = invoice.tax || 0;
-  const grandTotal = invoice.grandTotal || (subtotal + tax);
+  const grandTotal = invoice.grandTotal || (calculatedGrandTotal + tax);
   const amountPaid = invoice.amountReceived !== undefined ? invoice.amountReceived : grandTotal;
-  const balanceDue = invoice.balanceAmount !== undefined ? invoice.balanceAmount : (grandTotal - amountPaid);
+  const balanceDue = invoice.balanceAmount !== undefined ? invoice.balanceAmount : Math.max(0, grandTotal - amountPaid);
   const isPaid = balanceDue <= 0;
 
   const handlePrint = () => {
@@ -34,11 +47,18 @@ export default function InvoiceModal({ invoice, onClose }) {
     const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
     
     let itemsText = items.map(item => {
-      const priceStr = isWholesalePrice 
-        ? `Wholesale ₹${item.wholesalePrice} [MRP ₹${item.mrp || item.wholesalePrice}]`
-        : `MRP ₹${item.mrp || item.wholesalePrice}`;
-      return `- ${item.productName} (${item.quantityGiven}x @ ${priceStr}) = ₹${item.totalAmount}`;
+      if (showWholesaleColumn) {
+        return `- ${item.productName} (${item.quantityGiven}x @ Wholesale ₹${item.wholesalePrice} [MRP ₹${item.mrp || item.wholesalePrice}]) = ₹${(item.quantityGiven * item.wholesalePrice).toFixed(2)}`;
+      } else {
+        return `- ${item.productName} (${item.quantityGiven}x @ MRP ₹${item.mrp || item.wholesalePrice}) = ₹${(item.quantityGiven * (item.mrp || item.wholesalePrice)).toFixed(2)}`;
+      }
     }).join('\n');
+
+    let summaryBlock = '';
+    if (isWholesalePrice) {
+      const discountLabel = isRetailer ? 'Retailer Trade Margin (20%)' : 'Discount (20%)';
+      summaryBlock = `Subtotal (at MRP): ₹${mrpSubtotal.toFixed(2)}\n${discountLabel}: -₹${discountVal.toFixed(2)}\n`;
+    }
 
     let marginOrDiscountNote = '';
     if (isWholesalePrice) {
@@ -55,12 +75,13 @@ export default function InvoiceModal({ invoice, onClose }) {
 ${customer.contactName ? `*Contact:* ${customer.contactName}\n` : ''}
 *Order Breakdown:*
 ${itemsText}
-${marginOrDiscountNote ? `\n${marginOrDiscountNote}` : ''}
+
 --------------------------------
-*Grand Total:* ₹${grandTotal.toFixed(2)}
+${summaryBlock}*Grand Total:* ₹${grandTotal.toFixed(2)}
 *Amount Paid:* ₹${amountPaid.toFixed(2)}
 *Balance Due:* ₹${balanceDue.toFixed(2)}
 *Status:* ${isPaid ? 'PAID ✅' : 'PENDING ⚠️'}
+${marginOrDiscountNote ? `\n${marginOrDiscountNote}` : ''}
 
 Thank you for choosing Gandham Spices!
 Website: https://gandhamspices.in`;
@@ -175,7 +196,7 @@ Website: https://gandhamspices.in`;
                     <th className="py-2.5 px-3">Product Item</th>
                     <th className="py-2.5 px-3">Batch #</th>
                     <th className="py-2.5 px-3 text-center">Qty (Packs)</th>
-                    {isWholesalePrice ? (
+                    {showWholesaleColumn ? (
                       <>
                         <th className="py-2.5 px-3 text-right">MRP Price</th>
                         <th className="py-2.5 px-3 text-right">Wholesale Price</th>
@@ -188,9 +209,13 @@ Website: https://gandhamspices.in`;
                 </thead>
                 <tbody className="divide-y divide-slate-200 font-medium">
                   {items.map((item, idx) => {
-                    const itemPriceType = item.priceType || invoice.priceType || 'Wholesale Price';
-                    const unitPriceUsed = itemPriceType === 'MRP Price' ? (item.mrp || item.wholesalePrice) : item.wholesalePrice;
-                    const totalAmt = item.totalAmount !== undefined ? item.totalAmount : (item.quantityGiven * unitPriceUsed);
+                    const mrpPrice = item.mrp || item.wholesalePrice || 0;
+                    const wholesalePrice = item.wholesalePrice || mrpPrice;
+
+                    // If showWholesaleColumn (Case 1), row total is wholesale total.
+                    // If !showWholesaleColumn (Case 2 & 3), row total is displayed at MRP total!
+                    const rowUnitPrice = showWholesaleColumn ? wholesalePrice : mrpPrice;
+                    const rowTotalAmount = item.quantityGiven * rowUnitPrice;
 
                     return (
                       <tr key={idx} className="hover:bg-slate-50">
@@ -202,16 +227,16 @@ Website: https://gandhamspices.in`;
                         <td className="py-3 px-3 font-mono text-[11px] text-slate-600">{item.batchNumber || 'N/A'}</td>
                         <td className="py-3 px-3 text-center font-bold text-slate-800">{item.quantityGiven}</td>
                         
-                        {isWholesalePrice ? (
+                        {showWholesaleColumn ? (
                           <>
-                            <td className="py-3 px-3 text-right text-slate-700 font-semibold">₹{item.mrp || item.wholesalePrice}</td>
-                            <td className="py-3 px-3 text-right font-bold text-slate-900">₹{item.wholesalePrice}</td>
+                            <td className="py-3 px-3 text-right text-slate-700 font-semibold">₹{mrpPrice}</td>
+                            <td className="py-3 px-3 text-right font-bold text-slate-900">₹{wholesalePrice}</td>
                           </>
                         ) : (
-                          <td className="py-3 px-3 text-right font-bold text-slate-900">₹{item.mrp || item.wholesalePrice}</td>
+                          <td className="py-3 px-3 text-right font-bold text-slate-900">₹{mrpPrice}</td>
                         )}
 
-                        <td className="py-3 px-3 text-right font-black text-slate-900">₹{totalAmt.toFixed(2)}</td>
+                        <td className="py-3 px-3 text-right font-black text-slate-900">₹{rowTotalAmount.toFixed(2)}</td>
                       </tr>
                     );
                   })}
@@ -240,24 +265,38 @@ Website: https://gandhamspices.in`;
               <div className="w-full sm:w-72 space-y-2 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Subtotal {isWholesalePrice ? '(at MRP)' : ''}:</span>
-                  <span className="font-semibold text-slate-900">₹{(isWholesalePrice ? mrpSubtotal : subtotal).toFixed(2)}</span>
+                  <span className="font-semibold text-slate-900">₹{mrpSubtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-emerald-600 font-bold">
-                  <span>{isWholesalePrice ? (isRetailer ? 'Retailer Margin (20%):' : 'Discount (20%):') : 'Discount:'}</span>
-                  <span>{discountVal > 0 ? `-₹${discountVal.toFixed(2)}` : '₹0.00'}</span>
-                </div>
+                
+                {isWholesalePrice && (
+                  <div className="flex justify-between text-emerald-600 font-bold">
+                    <span>{isRetailer ? 'Retailer Margin (20%):' : 'Discount (20%):'}</span>
+                    <span>-₹{discountVal.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {!isWholesalePrice && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Discount:</span>
+                    <span className="font-semibold text-slate-900">₹0.00</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between text-slate-600">
                   <span>GST / Tax:</span>
                   <span className="font-semibold text-slate-900">₹0.00 (Inclusive)</span>
                 </div>
+
                 <div className="border-t-2 border-slate-900 pt-2 flex justify-between font-black text-sm text-slate-900">
                   <span>Grand Total:</span>
                   <span className="text-saffron text-base">₹{grandTotal.toFixed(2)}</span>
                 </div>
+                
                 <div className="flex justify-between text-emerald-700 font-bold">
                   <span>Amount Paid:</span>
                   <span>₹{amountPaid.toFixed(2)}</span>
                 </div>
+
                 <div className="border-t border-slate-200 pt-1.5 flex justify-between font-bold text-slate-800">
                   <span>Balance Dues:</span>
                   <span className={balanceDue > 0 ? 'text-red-600 font-black' : 'text-slate-400'}>
