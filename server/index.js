@@ -1410,55 +1410,147 @@ app.delete('/api/admin/customers/:id', authenticateToken, async (req, res) => {
 });
 
 
-// ---------------- DELIVERIES CRUD ----------------
+// ---------------- DELIVERIES & ORDER INTEGRATION CRUD ----------------
 app.get('/api/admin/deliveries', authenticateToken, (req, res) => {
-  res.json(getDB().deliveries);
+  res.json(getDB().deliveries || []);
 });
 
 app.post('/api/admin/deliveries', authenticateToken, async (req, res) => {
   const db = getDB();
+  const dspNumber = req.body.deliveryNumber || `DSP-${Date.now().toString().slice(-6)}`;
+  const qty = parseInt(req.body.quantity, 10) || 0;
+  const price = parseFloat(req.body.wholesalePrice) || 0;
+  const tot = qty * price;
+
   const newDelivery = {
     id: `d_${Date.now()}`,
-    status: 'Pending',
+    deliveryNumber: dspNumber,
+    status: req.body.status || 'Pending',
     ...req.body,
-    quantity: parseInt(req.body.quantity, 10),
-    wholesalePrice: parseFloat(req.body.wholesalePrice),
-    totalAmount: parseInt(req.body.quantity, 10) * parseFloat(req.body.wholesalePrice)
+    quantity: qty,
+    wholesalePrice: price,
+    totalAmount: tot
   };
 
+  if (!db.deliveries) db.deliveries = [];
   db.deliveries.push(newDelivery);
+
+  // Automatically sync/create linked order in db.orders
+  if (!db.orders) db.orders = [];
+  const customer = (db.customers || []).find(c => c.id === newDelivery.customerId);
+  const product = (db.products || []).find(p => p.id === newDelivery.productId);
+
+  let mappedOrderStatus = 'Processing';
+  if (newDelivery.status === 'Dispatched') mappedOrderStatus = 'Dispatched';
+  else if (newDelivery.status === 'Delivered') mappedOrderStatus = 'Delivered';
+  else if (newDelivery.status === 'Cancelled') mappedOrderStatus = 'Cancelled';
+
+  const newOrder = {
+    id: `ord_${newDelivery.id}`,
+    invoiceNumber: dspNumber,
+    deliveryId: newDelivery.id,
+    orderDate: newDelivery.deliveryDate || new Date().toISOString().split('T')[0],
+    customerId: newDelivery.customerId,
+    shopName: customer ? customer.shopName : 'Direct Customer',
+    productId: newDelivery.productId,
+    productName: product ? product.name : 'Spice Packets',
+    quantity: qty,
+    wholesalePrice: price,
+    totalAmount: tot,
+    status: mappedOrderStatus,
+    notes: newDelivery.notes || `Scheduled dispatch by ${newDelivery.deliveredBy || 'Logistics'}`
+  };
+
+  db.orders.push(newOrder);
+
+  db.recentActivities.unshift({
+    id: `a_${Date.now()}`,
+    action: 'Scheduled Dispatch & Order',
+    details: `Created dispatch & order ${dspNumber} for ${qty} packs to ${newOrder.shopName}.`,
+    timestamp: new Date().toISOString()
+  });
+
   await commit();
   res.status(201).json(newDelivery);
 });
 
 app.put('/api/admin/deliveries/:id', authenticateToken, async (req, res) => {
   const db = getDB();
-  const index = db.deliveries.findIndex(d => d.id === req.params.id);
+  const index = (db.deliveries || []).findIndex(d => d.id === req.params.id);
   if (index === -1) return res.status(404).json({ message: 'Delivery record not found' });
 
   const prevStatus = db.deliveries[index].status;
   db.deliveries[index] = { ...db.deliveries[index], ...req.body };
+  const updatedDelivery = db.deliveries[index];
+
+  // Sync linked order in db.orders
+  if (!db.orders) db.orders = [];
+  const orderIdx = db.orders.findIndex(o => o.deliveryId === updatedDelivery.id || o.invoiceNumber === updatedDelivery.deliveryNumber);
+  
+  let mappedOrderStatus = 'Processing';
+  if (updatedDelivery.status === 'Dispatched') mappedOrderStatus = 'Dispatched';
+  else if (updatedDelivery.status === 'Delivered') mappedOrderStatus = 'Delivered';
+  else if (updatedDelivery.status === 'Cancelled') mappedOrderStatus = 'Cancelled';
+
+  const customer = (db.customers || []).find(c => c.id === updatedDelivery.customerId);
+  const product = (db.products || []).find(p => p.id === updatedDelivery.productId);
+
+  if (orderIdx !== -1) {
+    db.orders[orderIdx] = {
+      ...db.orders[orderIdx],
+      customerId: updatedDelivery.customerId,
+      shopName: customer ? customer.shopName : db.orders[orderIdx].shopName,
+      productId: updatedDelivery.productId,
+      productName: product ? product.name : db.orders[orderIdx].productName,
+      quantity: updatedDelivery.quantity,
+      wholesalePrice: updatedDelivery.wholesalePrice,
+      totalAmount: updatedDelivery.totalAmount,
+      orderDate: updatedDelivery.deliveryDate || db.orders[orderIdx].orderDate,
+      status: mappedOrderStatus,
+      notes: updatedDelivery.notes || db.orders[orderIdx].notes
+    };
+  } else {
+    db.orders.push({
+      id: `ord_${updatedDelivery.id}`,
+      invoiceNumber: updatedDelivery.deliveryNumber || `DSP-${Date.now().toString().slice(-6)}`,
+      deliveryId: updatedDelivery.id,
+      orderDate: updatedDelivery.deliveryDate || new Date().toISOString().split('T')[0],
+      customerId: updatedDelivery.customerId,
+      shopName: customer ? customer.shopName : 'Direct Customer',
+      productId: updatedDelivery.productId,
+      productName: product ? product.name : 'Spice Packets',
+      quantity: updatedDelivery.quantity,
+      wholesalePrice: updatedDelivery.wholesalePrice,
+      totalAmount: updatedDelivery.totalAmount,
+      status: mappedOrderStatus,
+      notes: updatedDelivery.notes || `Scheduled dispatch by ${updatedDelivery.deliveredBy || 'Logistics'}`
+    });
+  }
 
   // Log dispatch or delivery events
   if (req.body.status && req.body.status !== prevStatus) {
     db.recentActivities.unshift({
       id: `a_${Date.now()}`,
       action: `Delivery ${req.body.status}`,
-      details: `Delivery status updated to ${req.body.status} for ${db.deliveries[index].quantity} packets to customer.`,
+      details: `Delivery status updated to ${req.body.status} for ${updatedDelivery.quantity} packets to customer.`,
       timestamp: new Date().toISOString()
     });
   }
 
   await commit();
-  res.json(db.deliveries[index]);
+  res.json(updatedDelivery);
 });
 
 app.delete('/api/admin/deliveries/:id', authenticateToken, async (req, res) => {
   const db = getDB();
-  const index = db.deliveries.findIndex(d => d.id === req.params.id);
+  const index = (db.deliveries || []).findIndex(d => d.id === req.params.id);
   if (index === -1) return res.status(404).json({ message: 'Delivery record not found' });
 
   const deleted = db.deliveries.splice(index, 1)[0];
+  if (db.orders) {
+    db.orders = db.orders.filter(o => o.deliveryId !== deleted.id && o.invoiceNumber !== deleted.deliveryNumber);
+  }
+
   await commit();
   res.json({ message: 'Delivery record deleted', delivery: deleted });
 });
@@ -1627,22 +1719,22 @@ app.get('/api/admin/invoices', authenticateToken, (req, res) => {
 
 app.put('/api/admin/sales/:id', authenticateToken, async (req, res) => {
   const db = getDB();
-  const index = db.sales.findIndex(s => s.id === req.params.id);
+  const index = (db.sales || []).findIndex(s => s.id === req.params.id);
   if (index === -1) return res.status(404).json({ message: 'Sale record not found' });
 
   const current = db.sales[index];
   const { date, customerId, productId, batchId, quantityGiven, priceType, amountReceived, paymentStatus, paymentDate, remarks } = req.body;
 
   const targetCustId = customerId || current.customerId;
-  const customer = db.customers.find(c => c.id === targetCustId);
+  const customer = (db.customers || []).find(c => c.id === targetCustId);
   const shopName = customer ? customer.shopName : current.shopName;
 
   const prodId = productId || current.productId;
-  const product = db.products.find(p => p.id === prodId);
+  const product = (db.products || []).find(p => p.id === prodId);
   if (!product) return res.status(404).json({ message: 'Product not found' });
 
   const targetBatchId = batchId || current.batchId;
-  const batch = db.batches.find(b => b.id === targetBatchId);
+  const batch = (db.batches || []).find(b => b.id === targetBatchId);
   if (!batch) return res.status(404).json({ message: 'Production batch not found' });
 
   const qty = parseInt(quantityGiven !== undefined ? quantityGiven : current.quantityGiven, 10) || 0;
@@ -1652,10 +1744,6 @@ app.put('/api/admin/sales/:id', authenticateToken, async (req, res) => {
 
   const totalReceivable = qty * unitPriceUsed;
   const balance = totalReceivable - received;
-
-  if (customer) {
-    customer.outstandingBalance = Math.max(0, parseFloat((customer.outstandingBalance - current.balanceAmount + balance).toFixed(2)));
-  }
 
   db.sales[index] = {
     ...current,
@@ -1681,35 +1769,130 @@ app.put('/api/admin/sales/:id', authenticateToken, async (req, res) => {
 
   recalculateBatchStocks(db);
 
+  // 2-Way Sync with Pending Payments & Customer Dues
+  const invNo = db.sales[index].invoiceNumber;
+  if (!db.pendingPayments) db.pendingPayments = [];
+  const ppIdx = db.pendingPayments.findIndex(p => p.invoiceNumber === invNo || p.id === current.id);
+  
+  if (ppIdx !== -1) {
+    db.pendingPayments[ppIdx].totalAmount = parseFloat(totalReceivable.toFixed(2));
+    db.pendingPayments[ppIdx].amountPaid = parseFloat(received.toFixed(2));
+    db.pendingPayments[ppIdx].pendingAmount = Math.max(0, parseFloat(balance.toFixed(2)));
+    db.pendingPayments[ppIdx].status = balance <= 0 ? 'Paid' : 'Pending';
+  } else if (balance > 0) {
+    db.pendingPayments.push({
+      id: `pp_${Date.now()}`,
+      customerId: targetCustId,
+      invoiceNumber: invNo,
+      totalAmount: parseFloat(totalReceivable.toFixed(2)),
+      amountPaid: parseFloat(received.toFixed(2)),
+      pendingAmount: parseFloat(balance.toFixed(2)),
+      dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      status: 'Pending'
+    });
+  }
+
+  if (customer) {
+    const custSales = db.sales.filter(s => s.customerId === customer.id);
+    customer.outstandingBalance = custSales.reduce((acc, s) => acc + (s.balanceAmount || 0), 0);
+  }
+
   await commit();
   res.json(db.sales[index]);
 });
 
 app.delete('/api/admin/sales/:id', authenticateToken, async (req, res) => {
   const db = getDB();
-  const index = db.sales.findIndex(s => s.id === req.params.id);
+  const index = (db.sales || []).findIndex(s => s.id === req.params.id);
   if (index === -1) return res.status(404).json({ message: 'Sale record not found' });
 
   const deleted = db.sales.splice(index, 1)[0];
 
   recalculateBatchStocks(db);
 
-  const customer = db.customers.find(c => c.id === deleted.customerId);
-  if (customer) {
-    customer.outstandingBalance = Math.max(0, parseFloat((customer.outstandingBalance - deleted.balanceAmount).toFixed(2)));
+  if (db.pendingPayments) {
+    db.pendingPayments = db.pendingPayments.filter(pp => pp.invoiceNumber !== deleted.invoiceNumber && pp.id !== deleted.id);
   }
 
-  db.pendingPayments = db.pendingPayments.filter(pp => pp.invoiceNumber !== deleted.id);
+  const customer = (db.customers || []).find(c => c.id === deleted.customerId);
+  if (customer) {
+    const custSales = (db.sales || []).filter(s => s.customerId === customer.id);
+    customer.outstandingBalance = custSales.reduce((acc, s) => acc + (s.balanceAmount || 0), 0);
+  }
 
   db.recentActivities.unshift({
     id: `a_${Date.now()}`,
     action: 'Deleted Invoice',
-    details: `Deleted Invoice ${deleted.id} (₹${deleted.totalAmountReceivable}).`,
+    details: `Deleted Invoice ${deleted.invoiceNumber || deleted.id} (₹${deleted.totalAmountReceivable}).`,
     timestamp: new Date().toISOString()
   });
 
   await commit();
   res.json({ message: 'Invoice removed', sale: deleted });
+});
+
+// ---------------- PENDING PAYMENTS CRUD & PAY SYNC ----------------
+app.get('/api/admin/pending-payments', authenticateToken, (req, res) => {
+  res.json(getDB().pendingPayments || []);
+});
+
+app.post('/api/admin/pending-payments/:id/pay', authenticateToken, async (req, res) => {
+  const { amountPaid } = req.body;
+  const db = getDB();
+
+  if (!db.pendingPayments) db.pendingPayments = [];
+  if (!db.sales) db.sales = [];
+
+  const ppIndex = db.pendingPayments.findIndex(p => p.id === req.params.id);
+  if (ppIndex === -1) return res.status(404).json({ message: 'Payment record not found' });
+  const pp = db.pendingPayments[ppIndex];
+
+  const pay = parseFloat(amountPaid) || 0;
+  pp.amountPaid = parseFloat((pp.amountPaid + pay).toFixed(2));
+  pp.pendingAmount = Math.max(0, parseFloat((pp.totalAmount - pp.amountPaid).toFixed(2)));
+  pp.status = pp.pendingAmount <= 0 ? 'Paid' : 'Pending';
+
+  // 1. Sync matching sales records
+  const matchingSales = db.sales.filter(s => s.invoiceNumber === pp.invoiceNumber || s.id === pp.invoiceNumber);
+  if (matchingSales.length > 0) {
+    let remaining = pay;
+    for (const sale of matchingSales) {
+      if (remaining <= 0) break;
+      const needed = sale.balanceAmount;
+      const applyAmt = Math.min(remaining, needed);
+      sale.amountReceived = parseFloat(((sale.amountReceived || 0) + applyAmt).toFixed(2));
+      sale.balanceAmount = Math.max(0, parseFloat((sale.totalAmountReceivable - sale.amountReceived).toFixed(2)));
+      sale.paymentStatus = sale.balanceAmount <= 0 ? 'Paid' : (sale.amountReceived > 0 ? 'Partially Paid' : 'Pending');
+      remaining -= applyAmt;
+    }
+  }
+
+  // 2. Sync customer outstanding balance
+  const customer = (db.customers || []).find(c => c.id === pp.customerId);
+  if (customer) {
+    const custSales = db.sales.filter(s => s.customerId === customer.id);
+    customer.outstandingBalance = custSales.reduce((acc, s) => acc + (s.balanceAmount || 0), 0);
+  }
+
+  // 3. Sync order status if fully paid
+  const order = (db.orders || []).find(o => o.invoiceNumber === pp.invoiceNumber);
+  if (order && pp.pendingAmount <= 0) {
+    order.status = 'Paid';
+  }
+
+  db.recentActivities.unshift({
+    id: `a_${Date.now()}`,
+    action: 'Collected Payment',
+    details: `Collected ₹${pay} for invoice ${pp.invoiceNumber} from ${customer ? customer.shopName : 'Customer'}.`,
+    timestamp: new Date().toISOString()
+  });
+
+  if (pp.status === 'Paid') {
+    db.notifications = (db.notifications || []).filter(n => !(n.type === 'Pending Payment' && n.message.includes(pp.invoiceNumber)));
+  }
+
+  await commit();
+  res.json({ message: 'Payment applied successfully', pendingPayment: pp });
 });
 
 
@@ -1811,30 +1994,109 @@ app.post('/api/admin/pending-payments/:id/pay', authenticateToken, async (req, r
 });
 
 
-// ---------------- ORDER WORKFLOW CRUD ----------------
+// ---------------- ORDER WORKFLOW & DELIVERY SYNC CRUD ----------------
 app.get('/api/admin/orders', authenticateToken, (req, res) => {
-  res.json(getDB().orders);
+  res.json(getDB().orders || []);
+});
+
+app.post('/api/admin/orders', authenticateToken, async (req, res) => {
+  const db = getDB();
+  if (!db.orders) db.orders = [];
+  if (!db.deliveries) db.deliveries = [];
+
+  const customer = (db.customers || []).find(c => c.id === req.body.customerId);
+  const product = (db.products || []).find(p => p.id === req.body.productId);
+  const qty = parseInt(req.body.quantity, 10) || 1;
+  const price = parseFloat(req.body.wholesalePrice) || (product ? product.wholesalePrice : 0);
+  const total = qty * price;
+  const invNo = req.body.invoiceNumber || `DSP-${Date.now().toString().slice(-6)}`;
+
+  const newOrder = {
+    id: `ord_${Date.now()}`,
+    invoiceNumber: invNo,
+    orderDate: req.body.orderDate || new Date().toISOString().split('T')[0],
+    customerId: req.body.customerId,
+    shopName: customer ? customer.shopName : 'Direct Shop',
+    productId: req.body.productId,
+    productName: product ? product.name : 'Spice Packets',
+    quantity: qty,
+    wholesalePrice: price,
+    totalAmount: total,
+    status: req.body.status || 'Processing',
+    notes: req.body.notes || ''
+  };
+
+  db.orders.push(newOrder);
+
+  // Sync to deliveries
+  let mappedDeliveryStatus = 'Pending';
+  if (newOrder.status === 'Dispatched') mappedDeliveryStatus = 'Dispatched';
+  else if (newOrder.status === 'Delivered' || newOrder.status === 'Paid') mappedDeliveryStatus = 'Delivered';
+
+  const newDelivery = {
+    id: `d_${Date.now()}`,
+    deliveryNumber: invNo,
+    customerId: newOrder.customerId,
+    productId: newOrder.productId,
+    quantity: qty,
+    wholesalePrice: price,
+    totalAmount: total,
+    deliveredBy: 'Logistics',
+    deliveryDate: newOrder.orderDate,
+    status: mappedDeliveryStatus,
+    notes: newOrder.notes
+  };
+  newOrder.deliveryId = newDelivery.id;
+  db.deliveries.push(newDelivery);
+
+  db.recentActivities.unshift({
+    id: `a_${Date.now()}`,
+    action: 'Created Order & Dispatch',
+    details: `Created Order & Dispatch ${invNo} for ${qty} packs to ${newOrder.shopName}.`,
+    timestamp: new Date().toISOString()
+  });
+
+  await commit();
+  res.status(201).json(newOrder);
 });
 
 app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
   const db = getDB();
-  const index = db.orders.findIndex(o => o.id === req.params.id);
+  const index = (db.orders || []).findIndex(o => o.id === req.params.id);
   if (index === -1) return res.status(404).json({ message: 'Order not found' });
 
   const prevStatus = db.orders[index].status;
   db.orders[index] = { ...db.orders[index], ...req.body };
+  const updatedOrder = db.orders[index];
+
+  // Sync back to linked delivery in db.deliveries
+  if (!db.deliveries) db.deliveries = [];
+  const deliveryIdx = db.deliveries.findIndex(d => d.id === updatedOrder.deliveryId || d.deliveryNumber === updatedOrder.invoiceNumber);
+  
+  if (deliveryIdx !== -1) {
+    let mappedDeliveryStatus = db.deliveries[deliveryIdx].status;
+    if (req.body.status) {
+      if (req.body.status === 'Dispatched') mappedDeliveryStatus = 'Dispatched';
+      else if (req.body.status === 'Delivered' || req.body.status === 'Paid') mappedDeliveryStatus = 'Delivered';
+      else if (req.body.status === 'New Order' || req.body.status === 'Processing' || req.body.status === 'Packed') mappedDeliveryStatus = 'Pending';
+    }
+    db.deliveries[deliveryIdx].status = mappedDeliveryStatus;
+    if (req.body.quantity) db.deliveries[deliveryIdx].quantity = updatedOrder.quantity;
+    if (req.body.wholesalePrice) db.deliveries[deliveryIdx].wholesalePrice = updatedOrder.wholesalePrice;
+    if (updatedOrder.totalAmount) db.deliveries[deliveryIdx].totalAmount = updatedOrder.totalAmount;
+  }
 
   if (req.body.status && req.body.status !== prevStatus) {
     db.recentActivities.unshift({
       id: `a_${Date.now()}`,
       action: 'Order Stage Shift',
-      details: `Order ${db.orders[index].invoiceNumber} moved to stage: ${req.body.status}`,
+      details: `Order ${updatedOrder.invoiceNumber} moved to stage: ${req.body.status}`,
       timestamp: new Date().toISOString()
     });
   }
 
   await commit();
-  res.json(db.orders[index]);
+  res.json(updatedOrder);
 });
 
 

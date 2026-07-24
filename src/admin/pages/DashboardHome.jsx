@@ -17,6 +17,9 @@ export default function DashboardHome({ isDarkMode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hoveredDataPoint, setHoveredDataPoint] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [reloadNotice, setReloadNotice] = useState('');
 
   const fetchStatsAndTargets = async () => {
     setLoading(true);
@@ -35,6 +38,17 @@ export default function DashboardHome({ isDarkMode }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReloadMetrics = async () => {
+    setIsRefreshing(true);
+    setReloadNotice('');
+    await fetchStatsAndTargets();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLastRefreshed(timeStr);
+    setReloadNotice(`Dashboard metrics re-calculated & synced across all modules at ${timeStr}!`);
+    setTimeout(() => setIsRefreshing(false), 500);
+    setTimeout(() => setReloadNotice(''), 4000);
   };
 
   useEffect(() => {
@@ -427,14 +441,30 @@ export default function DashboardHome({ isDarkMode }) {
           </div>
         )}
 
-        <button
-          onClick={fetchStatsAndTargets}
-          className="flex items-center gap-1.5 text-xs text-saffron font-bold hover:text-orange-500 bg-saffron/10 px-3 py-1.5 rounded-xl transition-colors ml-auto sm:ml-0"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Reload Metrics</span>
-        </button>
+        <div className="flex items-center gap-2 ml-auto sm:ml-0">
+          {lastRefreshed && (
+            <span className="text-[10px] text-slate-400 font-medium hidden md:inline">
+              Last synced: {lastRefreshed}
+            </span>
+          )}
+          <button
+            onClick={handleReloadMetrics}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 text-xs text-saffron font-bold hover:text-orange-500 bg-saffron/10 px-3 py-1.5 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+            title="Recalculate and refresh all dashboard metrics in real time"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Recalculating...' : 'Reload Metrics'}</span>
+          </button>
+        </div>
       </div>
+
+      {reloadNotice && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 p-3 rounded-2xl flex items-center gap-2 text-xs font-bold animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+          <span>{reloadNotice}</span>
+        </div>
+      )}
 
       {/* ---------------- SALES TARGETS SCHEDULE NOTIFICATION BANNERS ---------------- */}
       {activeTarget && isBehind && (
